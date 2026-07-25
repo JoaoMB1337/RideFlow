@@ -1,0 +1,33 @@
+CREATE TABLE Train (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date INTEGER NOT NULL
+);
+
+CREATE TABLE TrainingData (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    idTrain INTEGER NOT NULL,
+    heartRate INTEGER,
+    power INTEGER,
+    speed REAL,
+    resistance INTEGER,
+    FOREIGN KEY (idTrain) REFERENCES Train(id) ON DELETE CASCADE
+);
+
+-- Consultas para Train
+insertTrain:
+INSERT INTO Train(date)
+VALUES (?);
+
+selectAllTrains:
+SELECT * FROM Train ORDER BY date DESC;
+
+deleteTrain:
+DELETE FROM Train WHERE id = ?;
+
+-- Consultas para TrainingData
+insertTrainingData:
+INSERT INTO TrainingData(idTrain, heartRate, power, speed, resistance)
+VALUES (?, ?, ?, ?, ?);
+
+selectDataForTrain:
+SELECT * FROM TrainingData WHERE idTrain = ? ORDER BY id ASC;
