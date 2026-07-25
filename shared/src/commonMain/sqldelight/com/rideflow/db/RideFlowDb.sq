@@ -1,11 +1,17 @@
 CREATE TABLE Train (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    date INTEGER NOT NULL
+    date INTEGER NOT NULL,
+    duration INTEGER DEFAULT 0,
+    avgHeartRate INTEGER DEFAULT 0,
+    avgPower INTEGER DEFAULT 0,
+    maxHeartRate INTEGER DEFAULT 0,
+    maxPower INTEGER DEFAULT 0
 );
 
 CREATE TABLE TrainingData (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     idTrain INTEGER NOT NULL,
+    timestampOffset INTEGER NOT NULL,
     heartRate INTEGER,
     power INTEGER,
     speed REAL,
@@ -21,13 +27,18 @@ VALUES (?);
 selectAllTrains:
 SELECT * FROM Train ORDER BY date DESC;
 
+updateTrainSummary:
+UPDATE Train
+SET duration = ?, avgHeartRate = ?, avgPower = ?, maxHeartRate = ?, maxPower = ?
+WHERE id = ?;
+
 deleteTrain:
 DELETE FROM Train WHERE id = ?;
 
 -- Consultas para TrainingData
 insertTrainingData:
-INSERT INTO TrainingData(idTrain, heartRate, power, speed, resistance)
-VALUES (?, ?, ?, ?, ?);
+INSERT INTO TrainingData(idTrain, timestampOffset, heartRate, power, speed, resistance)
+VALUES (?, ?, ?, ?, ?, ?);
 
 selectDataForTrain:
-SELECT * FROM TrainingData WHERE idTrain = ? ORDER BY id ASC;
+SELECT * FROM TrainingData WHERE idTrain = ? ORDER BY timestampOffset ASC;
