@@ -20,8 +20,8 @@ kotlin {
     
     android {
        namespace = "com.rideflow.shared"
-       compileSdk = libs.versions.android.compileSdk.get().toInt()
-       minSdk = libs.versions.android.minSdk.get().toInt()
+       compileSdk = 37
+       minSdk = 28
     
        compilerOptions {
            jvmTarget = JvmTarget.JVM_11
