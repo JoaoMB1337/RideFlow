@@ -7,5 +7,6 @@ data class TrainingData(
     val heartRate: Int?,
     val power: Int?,
     val speed: Double?,
+    val distance: Double?,
     val resistance: Int?
 )

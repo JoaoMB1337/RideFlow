@@ -36,13 +36,41 @@ class HistoryViewModel(
     fun onIntent(intent: HistoryIntent) {
         when (intent) {
             HistoryIntent.LoadHistory -> loadHistory()
-            is HistoryIntent.DeleteTrain -> deleteTrain(intent.id)
+            is HistoryIntent.DeleteTrains -> deleteTrains(intent.ids)
+            is HistoryIntent.ToggleSelection -> toggleSelection(intent.trainId)
+            HistoryIntent.ClearSelection -> clearSelection()
+            HistoryIntent.EnterSelectionMode -> enterSelectionMode()
         }
     }
 
-    private fun deleteTrain(id: Long) {
+    private fun enterSelectionMode() {
+        _uiState.update { it.copy(isSelectionMode = true) }
+    }
+
+    private fun clearSelection() {
+        _uiState.update { it.copy(isSelectionMode = false, selectedTrainIds = emptySet()) }
+    }
+
+    private fun toggleSelection(trainId: Long) {
+        _uiState.update { state ->
+            val newSelection = if (state.selectedTrainIds.contains(trainId)) {
+                state.selectedTrainIds - trainId
+            } else {
+                state.selectedTrainIds + trainId
+            }
+            state.copy(
+                selectedTrainIds = newSelection,
+                isSelectionMode = newSelection.isNotEmpty()
+            )
+        }
+    }
+
+    private fun deleteTrains(ids: Set<Long>) {
         viewModelScope.launch {
-            workoutRepository.deleteTrain(id)
+            ids.forEach { id ->
+                workoutRepository.deleteTrain(id)
+            }
+            clearSelection()
         }
     }
 }

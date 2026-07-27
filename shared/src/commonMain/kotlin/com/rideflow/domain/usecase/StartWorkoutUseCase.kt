@@ -1,7 +1,7 @@
 package com.rideflow.domain.usecase
 
 import com.rideflow.domain.repository.WorkoutRepository
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 class StartWorkoutUseCase(
     private val repository: WorkoutRepository

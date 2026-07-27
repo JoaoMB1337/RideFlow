@@ -4,12 +4,15 @@ import com.juul.kable.Peripheral
 import com.juul.kable.characteristicOf
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalUuidApi::class)
 class HeartRateDeviceHandler(private val peripheral: Peripheral) {
     
     private val heartRateMeasurement = characteristicOf(
-        service = "180d",
-        characteristic = "2a37"
+        service = Uuid.parse("0000180d-0000-1000-8000-00805f9b34fb"),
+        characteristic = Uuid.parse("00002a37-0000-1000-8000-00805f9b34fb")
     )
 
     val heartRate: Flow<Int> = peripheral.observe(heartRateMeasurement).map { data ->

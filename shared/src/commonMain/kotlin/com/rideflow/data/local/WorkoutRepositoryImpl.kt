@@ -29,6 +29,7 @@ class WorkoutRepositoryImpl(
             heartRate = data.heartRate?.toLong(),
             power = data.power?.toLong(),
             speed = data.speed,
+            distance = data.distance,
             resistance = data.resistance?.toLong()
         )
     }
@@ -36,6 +37,7 @@ class WorkoutRepositoryImpl(
     override suspend fun updateTrainSummary(train: Train) {
         queries.updateTrainSummary(
             duration = train.duration,
+            distance = train.distance,
             avgHeartRate = train.avgHeartRate.toLong(),
             avgPower = train.avgPower.toLong(),
             maxHeartRate = train.maxHeartRate.toLong(),

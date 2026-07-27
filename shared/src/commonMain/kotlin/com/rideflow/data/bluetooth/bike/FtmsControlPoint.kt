@@ -3,12 +3,15 @@ package com.rideflow.data.bluetooth.bike
 import com.juul.kable.Peripheral
 import com.juul.kable.WriteType
 import com.juul.kable.characteristicOf
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalUuidApi::class)
 class FtmsControlPoint(private val peripheral: Peripheral) {
 
     private val controlPoint = characteristicOf(
-        service = "1826",
-        characteristic = "2ad9"
+        service = Uuid.parse("00001826-0000-1000-8000-00805f9b34fb"),
+        characteristic = Uuid.parse("00002ad9-0000-1000-8000-00805f9b34fb")
     )
 
     suspend fun requestControl() {

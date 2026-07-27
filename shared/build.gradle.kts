@@ -54,14 +54,17 @@ kotlin {
             implementation(libs.compose.ui)
             implementation(libs.compose.components.resources)
             implementation(libs.compose.uiToolingPreview)
+            implementation(libs.compose.icons)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
+            implementation(libs.androidx.navigation.compose)
 
             // Bluetooth
             implementation(libs.kable.core)
 
             // Database
             implementation(libs.sqldelight.runtime)
+            implementation(libs.sqldelight.coroutines)
 
             // Preferences
             implementation(libs.multiplatform.settings)

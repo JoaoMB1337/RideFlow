@@ -2,17 +2,14 @@ package com.rideflow.presentation.history.detail
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rideflow.domain.repository.WorkoutRepository
 import com.rideflow.domain.usecase.GetWorkoutDetailUseCase
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 class TrainDetailViewModel(
-    private val getWorkoutDetailUseCase: GetWorkoutDetailUseCase
+    private val getWorkoutDetailUseCase: GetWorkoutDetailUseCase,
+    private val workoutRepository: WorkoutRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TrainDetailUiState())
@@ -21,6 +18,15 @@ class TrainDetailViewModel(
     fun onIntent(intent: TrainDetailIntent) {
         when (intent) {
             is TrainDetailIntent.LoadDetail -> loadDetail(intent.trainId)
+            TrainDetailIntent.DeleteTrain -> deleteTrain()
+        }
+    }
+
+    private fun deleteTrain() {
+        _uiState.value.train?.id?.let { id ->
+            viewModelScope.launch {
+                workoutRepository.deleteTrain(id)
+            }
         }
     }
 

@@ -18,5 +18,8 @@ interface SensorRepository {
     suspend fun connectHeartRateSensor(address: String)
     suspend fun connectBikeSensor(address: String)
     
+    suspend fun disconnectHeartRateSensor()
+    suspend fun disconnectBikeSensor()
+    
     suspend fun setResistance(level: Int)
 }

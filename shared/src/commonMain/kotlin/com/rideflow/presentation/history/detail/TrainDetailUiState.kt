@@ -11,4 +11,5 @@ data class TrainDetailUiState(
 
 sealed class TrainDetailIntent {
     data class LoadDetail(val trainId: Long) : TrainDetailIntent()
+    object DeleteTrain : TrainDetailIntent()
 }
