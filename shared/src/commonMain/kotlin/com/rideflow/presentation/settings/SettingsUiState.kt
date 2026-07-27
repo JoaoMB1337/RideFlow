@@ -1,0 +1,20 @@
+package com.rideflow.presentation.settings
+
+import com.juul.kable.Advertisement
+
+data class SettingsUiState(
+    val isScanning: Boolean = false,
+    val discoveredDevices: List<Advertisement> = emptyList(),
+    val scanningFor: ScannerTarget? = null
+)
+
+sealed class ScannerTarget {
+    object HeartRate : ScannerTarget()
+    object Bike : ScannerTarget()
+}
+
+sealed class SettingsIntent {
+    data class StartScan(val target: ScannerTarget) : SettingsIntent()
+    object StopScan : SettingsIntent()
+    data class ConnectDevice(val address: String, val target: ScannerTarget) : SettingsIntent()
+}
