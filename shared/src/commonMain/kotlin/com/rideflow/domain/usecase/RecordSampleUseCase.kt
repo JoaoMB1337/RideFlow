@@ -12,6 +12,7 @@ class RecordSampleUseCase(
         heartRate: Int?,
         power: Int?,
         speed: Double?,
+        distance: Double?,
         resistance: Int?
     ) {
         val data = TrainingData(
@@ -20,6 +21,7 @@ class RecordSampleUseCase(
             heartRate = heartRate,
             power = power,
             speed = speed,
+            distance = distance,
             resistance = resistance
         )
         repository.insertTrainingData(data)

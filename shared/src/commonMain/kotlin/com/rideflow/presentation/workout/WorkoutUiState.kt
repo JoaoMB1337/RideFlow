@@ -6,10 +6,11 @@ data class WorkoutUiState(
     val isWorkoutActive: Boolean = false,
     val currentTrainId: Long? = null,
     val durationSeconds: Long = 0,
+    val distance: Double = 0.0,
     val heartRate: Int? = null,
     val power: Int? = null,
     val speed: Double? = null,
-    val resistance: Int = 1,
+    val resistance: Int = 10,
     val heartRateConnection: SensorConnectionState = SensorConnectionState.Disconnected,
     val bikeConnection: SensorConnectionState = SensorConnectionState.Disconnected
 )

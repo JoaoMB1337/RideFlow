@@ -11,18 +11,23 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 class WorkoutRepositoryImpl(
     database: RideFlowDb
 ) : WorkoutRepository {
     private val queries = database.rideFlowDbQueries
 
-    override suspend fun startTrain(date: Long): Long {
-        queries.insertTrain(date)
-        return queries.lastInsertRowId().executeAsOne()
+    // O INSERT e o last_insert_rowid() têm de partilhar a mesma transação, senão um insert
+    // concorrente pode fazer com que devolvamos o id errado.
+    override suspend fun startTrain(date: Long): Long = withContext(Dispatchers.IO) {
+        queries.transactionWithResult {
+            queries.insertTrain(date)
+            queries.lastInsertRowId().executeAsOne()
+        }
     }
 
-    override suspend fun insertTrainingData(data: TrainingData) {
+    override suspend fun insertTrainingData(data: TrainingData): Unit = withContext(Dispatchers.IO) {
         queries.insertTrainingData(
             idTrain = data.idTrain,
             timestampOffset = data.timestampOffset,
@@ -34,14 +39,18 @@ class WorkoutRepositoryImpl(
         )
     }
 
-    override suspend fun updateTrainSummary(train: Train) {
+    override suspend fun updateTrainSummary(train: Train): Unit = withContext(Dispatchers.IO) {
         queries.updateTrainSummary(
             duration = train.duration,
             distance = train.distance,
             avgHeartRate = train.avgHeartRate.toLong(),
             avgPower = train.avgPower.toLong(),
+            avgSpeed = train.avgSpeed,
+            avgResistance = train.avgResistance.toLong(),
             maxHeartRate = train.maxHeartRate.toLong(),
             maxPower = train.maxPower.toLong(),
+            maxSpeed = train.maxSpeed,
+            maxResistance = train.maxResistance.toLong(),
             id = train.id
         )
     }
@@ -53,8 +62,8 @@ class WorkoutRepositoryImpl(
             .map { list -> list.map { it.toDomain() } }
     }
 
-    override suspend fun getTrainById(id: Long): Train? {
-        return queries.selectTrainById(id).executeAsOneOrNull()?.toDomain()
+    override suspend fun getTrainById(id: Long): Train? = withContext(Dispatchers.IO) {
+        queries.selectTrainById(id).executeAsOneOrNull()?.toDomain()
     }
 
     override fun getTrainingDataForTrain(trainId: Long): Flow<List<TrainingData>> {
@@ -64,7 +73,7 @@ class WorkoutRepositoryImpl(
             .map { list -> list.map { it.toDomain() } }
     }
 
-    override suspend fun deleteTrain(id: Long) {
+    override suspend fun deleteTrain(id: Long): Unit = withContext(Dispatchers.IO) {
         queries.deleteTrain(id)
     }
 }

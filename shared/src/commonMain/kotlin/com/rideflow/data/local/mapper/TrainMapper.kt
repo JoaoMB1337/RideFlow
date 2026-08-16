@@ -12,8 +12,12 @@ fun com.rideflow.db.Train.toDomain(): Train {
         distance = distance ?: 0.0,
         avgHeartRate = avgHeartRate?.toInt() ?: 0,
         avgPower = avgPower?.toInt() ?: 0,
+        avgSpeed = avgSpeed ?: 0.0,
+        avgResistance = avgResistance?.toInt() ?: 0,
         maxHeartRate = maxHeartRate?.toInt() ?: 0,
-        maxPower = maxPower?.toInt() ?: 0
+        maxPower = maxPower?.toInt() ?: 0,
+        maxSpeed = maxSpeed ?: 0.0,
+        maxResistance = maxResistance?.toInt() ?: 0
     )
 }
 

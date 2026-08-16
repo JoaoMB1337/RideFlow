@@ -9,6 +9,10 @@ data class Train(
     val distance: Double = 0.0,
     val avgHeartRate: Int = 0,
     val avgPower: Int = 0,
+    val avgSpeed: Double = 0.0,
+    val avgResistance: Int = 0,
     val maxHeartRate: Int = 0,
-    val maxPower: Int = 0
+    val maxPower: Int = 0,
+    val maxSpeed: Double = 0.0,
+    val maxResistance: Int = 0
 )

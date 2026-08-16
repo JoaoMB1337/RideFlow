@@ -15,4 +15,5 @@ sealed class HistoryIntent {
     data class ToggleSelection(val trainId: Long) : HistoryIntent()
     object ClearSelection : HistoryIntent()
     object EnterSelectionMode : HistoryIntent()
+    data class ShareWorkout(val trainId: Long) : HistoryIntent()
 }

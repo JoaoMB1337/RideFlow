@@ -5,8 +5,12 @@ CREATE TABLE Train (
     distance REAL DEFAULT 0.0,
     avgHeartRate INTEGER DEFAULT 0,
     avgPower INTEGER DEFAULT 0,
+    avgSpeed REAL DEFAULT 0.0,
+    avgResistance INTEGER DEFAULT 0,
     maxHeartRate INTEGER DEFAULT 0,
-    maxPower INTEGER DEFAULT 0
+    maxPower INTEGER DEFAULT 0,
+    maxSpeed REAL DEFAULT 0.0,
+    maxResistance INTEGER DEFAULT 0
 );
 
 CREATE TABLE TrainingData (
@@ -37,7 +41,7 @@ SELECT last_insert_rowid();
 
 updateTrainSummary:
 UPDATE Train
-SET duration = ?, distance = ?, avgHeartRate = ?, avgPower = ?, maxHeartRate = ?, maxPower = ?
+SET duration = ?, distance = ?, avgHeartRate = ?, avgPower = ?, avgSpeed = ?, avgResistance = ?, maxHeartRate = ?, maxPower = ?, maxSpeed = ?, maxResistance = ?
 WHERE id = ?;
 
 deleteTrain:

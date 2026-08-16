@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.rideflow.domain.model.Train
+import com.rideflow.util.formatDuration
 import org.koin.compose.viewmodel.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -238,16 +239,4 @@ fun HistoryStat(label: String, value: String) {
         Text(text = "$label: ", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
         Text(text = value, style = MaterialTheme.typography.bodySmall, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
     }
-}
-
-fun formatDuration(seconds: Long): String {
-    val h = seconds / 3600
-    val m = (seconds % 3600) / 60
-    val s = seconds % 60
-    
-    val hh = h.toString().padStart(2, '0')
-    val mm = m.toString().padStart(2, '0')
-    val ss = s.toString().padStart(2, '0')
-    
-    return "$hh:$mm:$ss"
 }

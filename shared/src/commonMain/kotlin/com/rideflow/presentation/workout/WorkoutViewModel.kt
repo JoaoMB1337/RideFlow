@@ -2,12 +2,11 @@ package com.rideflow.presentation.workout
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rideflow.domain.model.SensorConnectionState
 import com.rideflow.domain.repository.SensorRepository
-import com.rideflow.domain.usecase.RecordSampleUseCase
-import com.rideflow.domain.usecase.StartWorkoutUseCase
-import com.rideflow.domain.usecase.StopWorkoutUseCase
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import com.rideflow.domain.session.WorkoutSessionManager
+import com.russhwolf.settings.Settings
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,31 +14,78 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.coroutines.cancellation.CancellationException
 
+private const val KEY_HR_ADDRESS = "hr_device_address"
+private const val KEY_BIKE_ADDRESS = "bike_device_address"
+
+/**
+ * Casca fina: projeta o estado do [WorkoutSessionManager] e dos sensores para a UI e encaminha
+ * intents. Não é dono de nenhum timer nem de nenhuma gravação — se este ViewModel morrer
+ * (navegação, rotação, Activity destruída), o treino continua a decorrer.
+ */
 class WorkoutViewModel(
     private val sensorRepository: SensorRepository,
-    private val startWorkoutUseCase: StartWorkoutUseCase,
-    private val recordSampleUseCase: RecordSampleUseCase,
-    private val stopWorkoutUseCase: StopWorkoutUseCase
+    private val sessionManager: WorkoutSessionManager,
+    private val settings: Settings
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WorkoutUiState())
     val uiState: StateFlow<WorkoutUiState> = _uiState.asStateFlow()
 
-    private var timerJob: Job? = null
-    private var samplingJob: Job? = null
-
     init {
+        observeSession()
         observeSensors()
+        autoConnectDevices()
+    }
+
+    private fun observeSession() {
+        sessionManager.session
+            .onEach { session ->
+                _uiState.update {
+                    it.copy(
+                        isWorkoutActive = session != null,
+                        currentTrainId = session?.trainId,
+                        durationSeconds = session?.durationSeconds ?: 0,
+                        distance = session?.distanceKm ?: 0.0
+                    )
+                }
+            }
+            .launchIn(viewModelScope)
+    }
+
+    private fun autoConnectDevices() {
+        val hrAddr = settings.getStringOrNull(KEY_HR_ADDRESS)
+        val bikeAddr = settings.getStringOrNull(KEY_BIKE_ADDRESS)
+
+        viewModelScope.launch {
+            hrAddr?.let { sensorRepository.connectHeartRateSensor(it) }
+            bikeAddr?.let { sensorRepository.connectBikeSensor(it) }
+        }
     }
 
     private fun observeSensors() {
         sensorRepository.heartRateState
-            .onEach { state -> _uiState.update { it.copy(heartRateConnection = state) } }
+            .onEach { state ->
+                _uiState.update {
+                    it.copy(
+                        heartRateConnection = state,
+                        heartRate = if (state is SensorConnectionState.Connected) it.heartRate else null
+                    )
+                }
+            }
             .launchIn(viewModelScope)
 
         sensorRepository.bikeState
-            .onEach { state -> _uiState.update { it.copy(bikeConnection = state) } }
+            .onEach { state ->
+                _uiState.update {
+                    it.copy(
+                        bikeConnection = state,
+                        power = if (state is SensorConnectionState.Connected) it.power else null,
+                        speed = if (state is SensorConnectionState.Connected) it.speed else null
+                    )
+                }
+            }
             .launchIn(viewModelScope)
 
         sensorRepository.heartRate
@@ -61,64 +107,26 @@ class WorkoutViewModel(
 
     fun onIntent(intent: WorkoutIntent) {
         when (intent) {
-            WorkoutIntent.StartWorkout -> startWorkout()
-            WorkoutIntent.StopWorkout -> stopWorkout()
+            WorkoutIntent.StartWorkout -> viewModelScope.launch { startWorkout() }
+            WorkoutIntent.StopWorkout -> viewModelScope.launch { sessionManager.stop() }
             is WorkoutIntent.AdjustResistance -> adjustResistance(intent.level)
         }
     }
 
-    private fun startWorkout() {
-        viewModelScope.launch {
-            val trainId = startWorkoutUseCase()
-            _uiState.update { it.copy(isWorkoutActive = true, currentTrainId = trainId, durationSeconds = 0) }
-            startTimer()
-            startSampling(trainId)
-        }
-    }
-
-    private fun stopWorkout() {
-        viewModelScope.launch {
-            val state = _uiState.value
-            state.currentTrainId?.let { id ->
-                stopWorkoutUseCase(id, state.durationSeconds)
-            }
-            timerJob?.cancel()
-            samplingJob?.cancel()
-            _uiState.update { it.copy(isWorkoutActive = false, currentTrainId = null) }
+    private suspend fun startWorkout() {
+        try {
+            sessionManager.start()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Napier.e(tag = "Workout", throwable = e) { "Failed to start workout" }
         }
     }
 
     private fun adjustResistance(level: Int) {
         viewModelScope.launch {
+            _uiState.update { it.copy(resistance = level) }
             sensorRepository.setResistance(level)
-        }
-    }
-
-    private fun startTimer() {
-        timerJob?.cancel()
-        timerJob = viewModelScope.launch {
-            while (true) {
-                delay(1000)
-                _uiState.update { it.copy(durationSeconds = it.durationSeconds + 1) }
-            }
-        }
-    }
-
-    private fun startSampling(trainId: Long) {
-        samplingJob?.cancel()
-        samplingJob = viewModelScope.launch {
-            while (true) {
-                delay(1000)
-                val state = _uiState.value
-                recordSampleUseCase(
-                    trainId = trainId,
-                    offset = state.durationSeconds,
-                    heartRate = state.heartRate,
-                    power = state.power,
-                    speed = state.speed,
-                    resistance = state.resistance
-                )
-            }
         }
     }
 }

@@ -6,10 +6,13 @@ import com.rideflow.domain.model.TrainingData
 data class TrainDetailUiState(
     val train: Train? = null,
     val samples: List<TrainingData> = emptyList(),
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val userMaxHeartRate: Int? = null,
+    val isSharing: Boolean = false
 )
 
 sealed class TrainDetailIntent {
     data class LoadDetail(val trainId: Long) : TrainDetailIntent()
     object DeleteTrain : TrainDetailIntent()
+    object ShareSummary : TrainDetailIntent()
 }

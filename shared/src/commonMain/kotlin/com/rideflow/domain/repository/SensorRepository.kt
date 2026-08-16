@@ -1,16 +1,18 @@
 package com.rideflow.domain.repository
 
 import com.rideflow.domain.model.SensorConnectionState
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 
 interface SensorRepository {
-    val heartRateState: Flow<SensorConnectionState>
-    val bikeState: Flow<SensorConnectionState>
-    
-    val heartRate: Flow<Int?>
-    val power: Flow<Int?>
-    val speed: Flow<Double?>
-    val resistance: Flow<Int?>
+    // StateFlow (e não Flow) para que a camada de sessão possa ler o valor corrente
+    // no seu tick de amostragem sem ter de manter um coletor por métrica.
+    val heartRateState: StateFlow<SensorConnectionState>
+    val bikeState: StateFlow<SensorConnectionState>
+
+    val heartRate: StateFlow<Int?>
+    val power: StateFlow<Int?>
+    val speed: StateFlow<Double?>
+    val resistance: StateFlow<Int?>
 
     suspend fun startScanning()
     suspend fun stopScanning()
