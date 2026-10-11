@@ -1,0 +1,6 @@
+-- v1 -> v2: calorias, nome e notas no Train; índice em TrainingData(idTrain).
+ALTER TABLE Train ADD COLUMN calories INTEGER DEFAULT 0;
+ALTER TABLE Train ADD COLUMN name TEXT;
+ALTER TABLE Train ADD COLUMN notes TEXT;
+
+CREATE INDEX TrainingData_idTrain ON TrainingData(idTrain);

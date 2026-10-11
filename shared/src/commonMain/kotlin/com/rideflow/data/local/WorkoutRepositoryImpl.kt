@@ -51,8 +51,18 @@ class WorkoutRepositoryImpl(
             maxPower = train.maxPower.toLong(),
             maxSpeed = train.maxSpeed,
             maxResistance = train.maxResistance.toLong(),
+            calories = train.calories.toLong(),
             id = train.id
         )
+    }
+
+    override suspend fun updateTrainInfo(id: Long, name: String?, notes: String?): Unit =
+        withContext(Dispatchers.IO) {
+            queries.updateTrainInfo(name = name?.ifBlank { null }, notes = notes?.ifBlank { null }, id = id)
+        }
+
+    override suspend fun getUnfinishedTrainIds(): List<Long> = withContext(Dispatchers.IO) {
+        queries.selectUnfinishedTrainIds().executeAsList()
     }
 
     override fun getAllTrains(): Flow<List<Train>> {

@@ -10,7 +10,10 @@ CREATE TABLE Train (
     maxHeartRate INTEGER DEFAULT 0,
     maxPower INTEGER DEFAULT 0,
     maxSpeed REAL DEFAULT 0.0,
-    maxResistance INTEGER DEFAULT 0
+    maxResistance INTEGER DEFAULT 0,
+    calories INTEGER DEFAULT 0,
+    name TEXT,
+    notes TEXT
 );
 
 CREATE TABLE TrainingData (
@@ -24,6 +27,9 @@ CREATE TABLE TrainingData (
     resistance INTEGER,
     FOREIGN KEY (idTrain) REFERENCES Train(id) ON DELETE CASCADE
 );
+
+-- Sem este índice, ler os samples de um treino (e o ON DELETE CASCADE) faz scan à tabela toda.
+CREATE INDEX TrainingData_idTrain ON TrainingData(idTrain);
 
 -- Consultas para Train
 insertTrain:
@@ -41,8 +47,17 @@ SELECT last_insert_rowid();
 
 updateTrainSummary:
 UPDATE Train
-SET duration = ?, distance = ?, avgHeartRate = ?, avgPower = ?, avgSpeed = ?, avgResistance = ?, maxHeartRate = ?, maxPower = ?, maxSpeed = ?, maxResistance = ?
+SET duration = ?, distance = ?, avgHeartRate = ?, avgPower = ?, avgSpeed = ?, avgResistance = ?, maxHeartRate = ?, maxPower = ?, maxSpeed = ?, maxResistance = ?, calories = ?
 WHERE id = ?;
+
+updateTrainInfo:
+UPDATE Train SET name = ?, notes = ? WHERE id = ?;
+
+-- Treinos cujo resumo nunca foi escrito (app morta a meio do treino ou falha no stop).
+-- Um treino terminado tem sempre duration >= 1: só há samples a partir do segundo 1 e os
+-- treinos sem samples são apagados no stop.
+selectUnfinishedTrainIds:
+SELECT id FROM Train WHERE duration IS NULL OR duration = 0;
 
 deleteTrain:
 DELETE FROM Train WHERE id = ?;

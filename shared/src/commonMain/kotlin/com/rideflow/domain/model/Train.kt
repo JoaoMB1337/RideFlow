@@ -14,5 +14,9 @@ data class Train(
     val maxHeartRate: Int = 0,
     val maxPower: Int = 0,
     val maxSpeed: Double = 0.0,
-    val maxResistance: Int = 0
+    val maxResistance: Int = 0,
+    /** Estimativa a partir da potência: kJ mecânicos ≈ kcal metabólicas (eficiência ~24%). */
+    val calories: Int = 0,
+    val name: String? = null,
+    val notes: String? = null
 )
