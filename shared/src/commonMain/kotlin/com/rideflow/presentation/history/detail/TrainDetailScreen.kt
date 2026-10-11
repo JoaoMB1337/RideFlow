@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Share
@@ -41,6 +42,7 @@ fun TrainDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showEdit by remember { mutableStateOf(false) }
 
     LaunchedEffect(trainId) {
         viewModel.onIntent(TrainDetailIntent.LoadDetail(trainId))
@@ -56,6 +58,9 @@ fun TrainDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showEdit = true }, enabled = uiState.train != null) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit name and notes")
+                    }
                     IconButton(onClick = { viewModel.onIntent(TrainDetailIntent.ShareSummary) }) {
                         Icon(Icons.Default.Share, contentDescription = "Share ride")
                     }
@@ -181,6 +186,44 @@ fun TrainDetailScreen(
         )
     }
 
+    val train = uiState.train
+    if (showEdit && train != null) {
+        var name by remember { mutableStateOf(train.name.orEmpty()) }
+        var notes by remember { mutableStateOf(train.notes.orEmpty()) }
+        AlertDialog(
+            onDismissRequest = { showEdit = false },
+            title = { Text("Edit ride") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Name") },
+                        placeholder = { Text(formatDate(train.date)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = notes,
+                        onValueChange = { notes = it },
+                        label = { Text("Notes") },
+                        minLines = 3,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    viewModel.onIntent(TrainDetailIntent.UpdateInfo(name, notes))
+                    showEdit = false
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEdit = false }) { Text("Cancel") }
+            }
+        )
+    }
+
     if (uiState.isSharing) {
         AlertDialog(
             onDismissRequest = { viewModel.onShareComplete() },
@@ -213,12 +256,22 @@ fun TrainSummaryCard(train: Train) {
         shape = MaterialTheme.shapes.extraLarge
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            Text(formatDate(train.date), style = MaterialTheme.typography.titleLarge)
-            Text("Started at ${formatTimeOfDay(train.date)}", style = MaterialTheme.typography.bodyMedium)
+            Text(train.name ?: formatDate(train.date), style = MaterialTheme.typography.titleLarge)
+            Text(
+                if (train.name != null) "${formatDate(train.date)} · ${formatTimeOfDay(train.date)}"
+                else "Started at ${formatTimeOfDay(train.date)}",
+                style = MaterialTheme.typography.bodyMedium
+            )
             Spacer(modifier = Modifier.height(16.dp))
             Row(modifier = Modifier.fillMaxWidth()) {
                 SummaryItem(Modifier.weight(1f), "Duration", formatDuration(train.duration))
                 SummaryItem(Modifier.weight(1f), "Distance", formatDistance(train.distance))
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            SummaryItem(Modifier, "Calories", "${train.calories} kcal")
+            train.notes?.let {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(it, style = MaterialTheme.typography.bodyMedium)
             }
         }
     }

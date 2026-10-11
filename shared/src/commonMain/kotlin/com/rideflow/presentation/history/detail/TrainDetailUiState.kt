@@ -15,4 +15,5 @@ sealed class TrainDetailIntent {
     data class LoadDetail(val trainId: Long) : TrainDetailIntent()
     object DeleteTrain : TrainDetailIntent()
     object ShareSummary : TrainDetailIntent()
+    data class UpdateInfo(val name: String, val notes: String) : TrainDetailIntent()
 }

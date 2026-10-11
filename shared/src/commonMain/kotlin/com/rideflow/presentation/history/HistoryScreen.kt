@@ -222,9 +222,9 @@ fun TrainItem(
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(date, style = MaterialTheme.typography.titleMedium)
+                    Text(train.name ?: date, style = MaterialTheme.typography.titleMedium, maxLines = 1)
                     Text(
-                        formatTimeOfDay(train.date),
+                        if (train.name != null) "$date · ${formatTimeOfDay(train.date)}" else formatTimeOfDay(train.date),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

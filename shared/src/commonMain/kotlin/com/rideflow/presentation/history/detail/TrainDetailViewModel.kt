@@ -25,6 +25,7 @@ class TrainDetailViewModel(
             is TrainDetailIntent.LoadDetail -> loadDetail(intent.trainId)
             TrainDetailIntent.DeleteTrain -> deleteTrain()
             TrainDetailIntent.ShareSummary -> shareSummary()
+            is TrainDetailIntent.UpdateInfo -> updateInfo(intent.name, intent.notes)
         }
     }
 
@@ -46,6 +47,15 @@ class TrainDetailViewModel(
 
     fun onShareComplete() {
         _uiState.update { it.copy(isSharing = false) }
+    }
+
+    private fun updateInfo(name: String, notes: String) {
+        val id = _uiState.value.train?.id ?: return
+        viewModelScope.launch {
+            workoutRepository.updateTrainInfo(id, name, notes)
+            // O Train do detalhe é lido uma vez (não é Flow), por isso relemos da BD.
+            _uiState.update { it.copy(train = workoutRepository.getTrainById(id)) }
+        }
     }
 
     private fun deleteTrain() {
