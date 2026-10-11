@@ -2,90 +2,65 @@ package com.rideflow
 
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsBike
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.savedstate.read
 import com.rideflow.presentation.history.HistoryScreen
 import com.rideflow.presentation.history.detail.TrainDetailScreen
 import com.rideflow.presentation.navigation.Screen
 import com.rideflow.presentation.settings.SettingsScreen
+import com.rideflow.presentation.theme.RideFlowTheme
 import com.rideflow.presentation.workout.WorkoutScreen
 
-// Modern Dark Sport Palette
-private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFF00E676), // Electric Lime
-    secondary = Color(0xFF2979FF), // Bright Blue
-    tertiary = Color(0xFFFF3D00), // Vibrant Orange
-    background = Color(0xFF121212),
-    surface = Color(0xFF1E1E1E),
-    onPrimary = Color.Black,
-    onBackground = Color.White,
-    onSurface = Color.White
+private data class TopLevelTab(val screen: Screen, val label: String, val icon: ImageVector)
+
+private val tabs = listOf(
+    TopLevelTab(Screen.Workout, "Ride", Icons.AutoMirrored.Filled.DirectionsBike),
+    TopLevelTab(Screen.History, "History", Icons.Filled.History),
+    TopLevelTab(Screen.Settings, "Settings", Icons.Filled.Settings),
 )
 
 @Composable
 fun App() {
-    MaterialTheme(colorScheme = DarkColorScheme) {
+    RideFlowTheme {
         val navController = rememberNavController()
         var isWorkoutActive by remember { mutableStateOf(false) }
-        
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
-        ) {
-            Scaffold(
-                bottomBar = {
+
+        Scaffold(
+            bottomBar = {
+                // Durante o treino escondemos a navegação: menos toques acidentais e mais espaço para as métricas.
+                if (!isWorkoutActive) {
                     val currentBackStackEntry by navController.currentBackStackEntryAsState()
                     val currentRoute = currentBackStackEntry?.destination?.route
-                    
-                    if (!isWorkoutActive) {
-                        NavigationBar(
-                            tonalElevation = 0.dp,
-                            containerColor = MaterialTheme.colorScheme.surface
-                        ) {
+                    // O detalhe de um treino pertence ao separador "History".
+                    val selectedRoute = if (currentRoute == Screen.TrainDetail.route) Screen.History.route else currentRoute
+
+                    NavigationBar {
+                        tabs.forEach { tab ->
                             NavigationBarItem(
-                                icon = { Icon(Icons.AutoMirrored.Filled.DirectionsBike, contentDescription = "Ride") },
-                                label = { Text("Ride") },
-                                selected = currentRoute == Screen.Workout.route,
-                                onClick = { 
-                                    navController.navigate(Screen.Workout.route) {
-                                        popUpTo(navController.graph.startDestinationId)
-                                        launchSingleTop = true
-                                    }
-                                }
-                            )
-                            NavigationBarItem(
-                                icon = { Icon(Icons.Filled.History, contentDescription = "History") },
-                                label = { Text("History") },
-                                selected = currentRoute == Screen.History.route,
-                                onClick = { 
-                                    navController.navigate(Screen.History.route) {
-                                        popUpTo(navController.graph.startDestinationId)
-                                        launchSingleTop = true
-                                    }
-                                }
-                            )
-                            NavigationBarItem(
-                                icon = { Icon(Icons.Filled.Settings, contentDescription = "Settings") },
-                                label = { Text("Settings") },
-                                selected = currentRoute == Screen.Settings.route,
-                                onClick = { 
-                                    navController.navigate(Screen.Settings.route) {
+                                icon = { Icon(tab.icon, contentDescription = null) },
+                                label = { Text(tab.label) },
+                                selected = selectedRoute == tab.screen.route,
+                                onClick = {
+                                    navController.navigate(tab.screen.route) {
                                         popUpTo(navController.graph.startDestinationId)
                                         launchSingleTop = true
                                     }
@@ -94,41 +69,43 @@ fun App() {
                         }
                     }
                 }
-            ) { padding ->
-                NavHost(
-                    navController = navController,
-                    startDestination = Screen.Workout.route,
-                    modifier = Modifier.padding(padding),
-                    enterTransition = { EnterTransition.None },
-                    exitTransition = { ExitTransition.None },
-                    popEnterTransition = { EnterTransition.None },
-                    popExitTransition = { ExitTransition.None }
-                ) {
-                    composable(Screen.Workout.route) {
-                        WorkoutScreen(
-                            onWorkoutActiveChanged = { isWorkoutActive = it }
-                        )
-                    }
-                    composable(Screen.History.route) {
-                        HistoryScreen(
-                            onNavigateToDetail = { trainId ->
-                                navController.navigate(Screen.TrainDetail.createRoute(trainId))
-                            }
-                        )
-                    }
-                    composable(Screen.Settings.route) {
-                        SettingsScreen()
-                    }
-                    composable(
-                        route = Screen.TrainDetail.route,
-                        arguments = listOf(navArgument("trainId") { type = NavType.LongType })
-                    ) { backStackEntry ->
-                        val trainId = backStackEntry.arguments?.read { getLong("trainId") } ?: 0L
-                        TrainDetailScreen(
-                            trainId = trainId,
-                            onNavigateBack = { navController.popBackStack() }
-                        )
-                    }
+            }
+        ) { padding ->
+            NavHost(
+                navController = navController,
+                startDestination = Screen.Workout.route,
+                // consumeWindowInsets: os Scaffolds/TopAppBars de cada ecrã não voltam a aplicar
+                // os insets que este Scaffold já tratou (evita margens duplicadas).
+                modifier = Modifier.padding(padding).consumeWindowInsets(padding),
+                enterTransition = { EnterTransition.None },
+                exitTransition = { ExitTransition.None },
+                popEnterTransition = { EnterTransition.None },
+                popExitTransition = { ExitTransition.None }
+            ) {
+                composable(Screen.Workout.route) {
+                    WorkoutScreen(
+                        onWorkoutActiveChanged = { isWorkoutActive = it }
+                    )
+                }
+                composable(Screen.History.route) {
+                    HistoryScreen(
+                        onNavigateToDetail = { trainId ->
+                            navController.navigate(Screen.TrainDetail.createRoute(trainId))
+                        }
+                    )
+                }
+                composable(Screen.Settings.route) {
+                    SettingsScreen()
+                }
+                composable(
+                    route = Screen.TrainDetail.route,
+                    arguments = listOf(navArgument("trainId") { type = NavType.LongType })
+                ) { backStackEntry ->
+                    val trainId = backStackEntry.arguments?.read { getLong("trainId") } ?: 0L
+                    TrainDetailScreen(
+                        trainId = trainId,
+                        onNavigateBack = { navController.popBackStack() }
+                    )
                 }
             }
         }
