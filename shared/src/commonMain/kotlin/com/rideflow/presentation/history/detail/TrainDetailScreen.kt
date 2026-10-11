@@ -1,5 +1,6 @@
 package com.rideflow.presentation.history.detail
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -7,17 +8,28 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import com.rideflow.domain.model.Train
 import com.rideflow.domain.model.TrainingData
+import com.rideflow.util.formatDate
 import com.rideflow.util.formatDistance
 import com.rideflow.util.formatDuration
 import com.rideflow.util.formatSpeed
+import com.rideflow.util.formatTimeOfDay
 import org.koin.compose.viewmodel.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -37,7 +49,7 @@ fun TrainDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("SUMMARY", style = MaterialTheme.typography.labelLarge) },
+                title = { Text("Ride details") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -45,76 +57,97 @@ fun TrainDetailScreen(
                 },
                 actions = {
                     IconButton(onClick = { viewModel.onIntent(TrainDetailIntent.ShareSummary) }) {
-                        Icon(Icons.Default.Share, contentDescription = "Share")
+                        Icon(Icons.Default.Share, contentDescription = "Share ride")
                     }
                     IconButton(onClick = { showDeleteConfirm = true }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                        Icon(Icons.Default.Delete, contentDescription = "Delete ride", tint = MaterialTheme.colorScheme.error)
                     }
                 }
             )
         }
     ) { padding ->
         if (uiState.isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         } else {
-            Column(
-                modifier = Modifier
-                    .padding(padding)
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+            BoxWithConstraints(
+                modifier = Modifier.padding(padding).fillMaxSize(),
+                contentAlignment = Alignment.TopCenter
             ) {
-                uiState.train?.let { train ->
-                    TrainSummaryCard(train)
+                // Em ecrãs largos (tablet / paisagem) os gráficos ficam lado a lado.
+                val chartColumns = if (maxWidth >= 600.dp) 2 else 1
+
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = 1000.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    uiState.train?.let { train ->
+                        TrainSummaryCard(train)
+                        TrainStatsTable(train)
+                    }
+
+                    Text(
+                        "Charts",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(top = 8.dp, start = 4.dp)
+                    )
+
+                    // Zonas de HR calculadas a partir do perfil do utilizador (fallback para defaults se não houver perfil)
+                    val maxHr = uiState.userMaxHeartRate ?: 190
+                    val hrZones = remember(maxHr) { buildHrZones(maxHr) }
+
+                    val charts: List<@Composable (Modifier) -> Unit> = listOf(
+                        { m ->
+                            ChartContainer(
+                                label = "Heart rate (bpm)",
+                                samples = uiState.samples,
+                                valueSelector = { it.heartRate?.toDouble() },
+                                color = MaterialTheme.colorScheme.tertiary,
+                                zones = hrZones,
+                                maxOverride = (maxHr + 10).toDouble(),
+                                modifier = m
+                            )
+                        },
+                        { m ->
+                            ChartContainer(
+                                label = "Power (W)",
+                                samples = uiState.samples,
+                                valueSelector = { it.power?.toDouble() },
+                                color = MaterialTheme.colorScheme.primary,
+                                smoothingWindow = 3, // média móvel de 3s para suavizar picos instantâneos
+                                modifier = m
+                            )
+                        },
+                        { m ->
+                            ChartContainer(
+                                label = "Speed (km/h)",
+                                samples = uiState.samples,
+                                valueSelector = { it.speed?.toDouble() },
+                                color = MaterialTheme.colorScheme.secondary,
+                                modifier = m
+                            )
+                        },
+                        { m ->
+                            ChartContainer(
+                                label = "Resistance",
+                                samples = uiState.samples,
+                                valueSelector = { it.resistance?.toDouble() },
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = m
+                            )
+                        }
+                    )
+
+                    charts.chunked(chartColumns).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            row.forEach { chart -> chart(Modifier.weight(1f)) }
+                        }
+                    }
                 }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Zonas de HR calculadas a partir do perfil do utilizador (fallback para defaults se não houver perfil)
-                val maxHr = uiState.userMaxHeartRate ?: 190
-                val hrZones = remember(maxHr) { buildHrZones(maxHr) }
-
-                ChartContainer(
-                    label = "Heart Rate",
-                    samples = uiState.samples,
-                    valueSelector = { it.heartRate?.toDouble() },
-                    color = MaterialTheme.colorScheme.error,
-                    zones = hrZones,
-                    maxOverride = (maxHr + 10).toDouble()
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                ChartContainer(
-                    label = "Power",
-                    samples = uiState.samples,
-                    valueSelector = { it.power?.toDouble() },
-                    color = MaterialTheme.colorScheme.secondary,
-                    smoothingWindow = 3 // média móvel de 3s para suavizar picos instantâneos
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                ChartContainer(
-                    label = "Resistance",
-                    samples = uiState.samples,
-                    valueSelector = { it.resistance?.toDouble() },
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                ChartContainer(
-                    label = "Speed",
-                    samples = uiState.samples,
-                    valueSelector = { it.speed?.toDouble() },
-                    color = MaterialTheme.colorScheme.tertiary
-                )
-
-                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
@@ -122,8 +155,9 @@ fun TrainDetailScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete Workout") },
-            text = { Text("Are you sure you want to delete this workout?") },
+            icon = { Icon(Icons.Default.Delete, contentDescription = null) },
+            title = { Text("Delete ride?") },
+            text = { Text("This permanently removes the ride and all its recorded data.") },
             confirmButton = {
                 Button(
                     onClick = {
@@ -131,7 +165,10 @@ fun TrainDetailScreen(
                         showDeleteConfirm = false
                         onNavigateBack()
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    )
                 ) {
                     Text("Delete")
                 }
@@ -147,7 +184,7 @@ fun TrainDetailScreen(
     if (uiState.isSharing) {
         AlertDialog(
             onDismissRequest = { viewModel.onShareComplete() },
-            title = { Text("Share Workout") },
+            title = { Text("Share ride") },
             text = {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Creating your workout summary image...")
@@ -164,39 +201,24 @@ fun TrainDetailScreen(
     }
 }
 
+/** Cabeçalho: data/hora do treino + as duas métricas principais (duração e distância). */
 @Composable
 fun TrainSummaryCard(train: Train) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        ),
+        shape = MaterialTheme.shapes.extraLarge
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(formatDate(train.date), style = MaterialTheme.typography.titleLarge)
+            Text("Started at ${formatTimeOfDay(train.date)}", style = MaterialTheme.typography.bodyMedium)
+            Spacer(modifier = Modifier.height(16.dp))
             Row(modifier = Modifier.fillMaxWidth()) {
-                SummaryItem(Modifier.weight(1f), "Time", formatDuration(train.duration))
+                SummaryItem(Modifier.weight(1f), "Duration", formatDuration(train.duration))
                 SummaryItem(Modifier.weight(1f), "Distance", formatDistance(train.distance))
-                SummaryItem(Modifier.weight(1f), "Avg Speed", formatSpeed(train.avgSpeed))
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(modifier = Modifier.fillMaxWidth()) {
-                SummaryItem(Modifier.weight(1f), "Avg HR", "${train.avgHeartRate}")
-                SummaryItem(Modifier.weight(1f), "Avg Pwr", "${train.avgPower}W")
-                SummaryItem(Modifier.weight(1f), "Avg Res", "${train.avgResistance}")
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(modifier = Modifier.fillMaxWidth()) {
-                SummaryItem(Modifier.weight(1f), "Max HR", "${train.maxHeartRate}")
-                SummaryItem(Modifier.weight(1f), "Max Pwr", "${train.maxPower}W")
-                SummaryItem(Modifier.weight(1f), "Max Res", "${train.maxResistance}")
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(modifier = Modifier.fillMaxWidth()) {
-                SummaryItem(Modifier.weight(1f), "Date", train.date.toString().substringBefore("T"))
             }
         }
     }
@@ -204,9 +226,67 @@ fun TrainSummaryCard(train: Train) {
 
 @Composable
 fun SummaryItem(modifier: Modifier, label: String, value: String) {
-    Column(modifier = modifier) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-        Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Black)
+    Column(modifier = modifier.clearAndSetSemantics { contentDescription = "$label $value" }) {
+        Text(label.uppercase(), style = MaterialTheme.typography.labelMedium)
+        Text(value, style = MaterialTheme.typography.displaySmall, maxLines = 1)
+    }
+}
+
+/** Tabela média / máximo por métrica. */
+@Composable
+private fun TrainStatsTable(train: Train) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        shape = MaterialTheme.shapes.large
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+                Spacer(Modifier.weight(1.4f))
+                TableHeader("AVG", Modifier.weight(1f))
+                TableHeader("MAX", Modifier.weight(1f))
+            }
+            StatsRow(Icons.Default.Favorite, MaterialTheme.colorScheme.tertiary, "Heart rate",
+                "${train.avgHeartRate} bpm", "${train.maxHeartRate} bpm")
+            StatsRow(Icons.Default.Bolt, MaterialTheme.colorScheme.primary, "Power",
+                "${train.avgPower} W", "${train.maxPower} W")
+            StatsRow(Icons.Default.Speed, MaterialTheme.colorScheme.secondary, "Speed",
+                formatSpeed(train.avgSpeed), formatSpeed(train.maxSpeed))
+            StatsRow(Icons.Default.FitnessCenter, MaterialTheme.colorScheme.onSurfaceVariant, "Resistance",
+                "${train.avgResistance}", "${train.maxResistance}")
+        }
+    }
+}
+
+@Composable
+private fun TableHeader(text: String, modifier: Modifier) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.End,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun StatsRow(icon: ImageVector, tint: Color, label: String, avg: String, max: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 40.dp)
+            .clearAndSetSemantics { contentDescription = "$label: average $avg, maximum $max" },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(Modifier.weight(1.4f), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+        }
+        Text(avg, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.weight(1f))
+        Text(max, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.weight(1f))
     }
 }
 
@@ -225,17 +305,24 @@ fun ChartContainer(
     color: Color,
     zones: List<ChartZone> = emptyList(),
     maxOverride: Double? = null,
-    smoothingWindow: Int = 1 // 1 = sem suavização
+    smoothingWindow: Int = 1, // 1 = sem suavização
+    modifier: Modifier = Modifier
 ) {
+    val gridColor = MaterialTheme.colorScheme.outlineVariant
+    val axisColor = MaterialTheme.colorScheme.onSurfaceVariant
     Surface(
-        modifier = Modifier.fillMaxWidth().height(200.dp),
+        modifier = modifier.fillMaxWidth().height(220.dp),
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = color, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-            Spacer(modifier = Modifier.height(8.dp))
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(10.dp).background(color, androidx.compose.foundation.shape.CircleShape))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(label, style = MaterialTheme.typography.titleSmall)
+            }
+            Spacer(modifier = Modifier.height(12.dp))
             Box(modifier = Modifier.fillMaxSize()) {
 
                 // Pares (tempo, valor) — só os samples com valor não-nulo entram,
@@ -254,7 +341,7 @@ fun ChartContainer(
 
                 if (plotPoints.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No data", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                        Text("No data recorded", style = MaterialTheme.typography.bodyMedium, color = axisColor)
                     }
                 } else {
                     val maxVal = remember(plotPoints, maxOverride) {
@@ -293,7 +380,7 @@ fun ChartContainer(
                                     val yVal = (maxVal / steps) * i
                                     val yPos = yVal.toY()
                                     drawLine(
-                                        color = Color.Gray.copy(alpha = 0.2f),
+                                        color = gridColor.copy(alpha = 0.6f),
                                         start = androidx.compose.ui.geometry.Offset(0f, yPos),
                                         end = androidx.compose.ui.geometry.Offset(width, yPos),
                                         strokeWidth = 1.dp.toPx()
@@ -326,7 +413,7 @@ fun ChartContainer(
                                     Text(
                                         text = yVal.toInt().toString(),
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = Color.Gray
+                                        color = axisColor
                                     )
                                 }
                             }
@@ -337,9 +424,9 @@ fun ChartContainer(
                             modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("0:00", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                            Text(formatDuration(totalDurationSeconds / 2), style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                            Text(formatDuration(totalDurationSeconds), style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                            Text("0:00", style = MaterialTheme.typography.labelSmall, color = axisColor)
+                            Text(formatDuration(totalDurationSeconds / 2), style = MaterialTheme.typography.labelSmall, color = axisColor)
+                            Text(formatDuration(totalDurationSeconds), style = MaterialTheme.typography.labelSmall, color = axisColor)
                         }
                     }
                 }

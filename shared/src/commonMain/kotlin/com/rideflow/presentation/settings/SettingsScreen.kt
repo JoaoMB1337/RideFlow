@@ -1,131 +1,245 @@
 package com.rideflow.presentation.settings
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsBike
+import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.automirrored.filled.BluetoothSearching
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.rideflow.domain.model.SensorConnectionState
+import com.rideflow.domain.repository.SensorRepository
+import com.rideflow.presentation.workout.statusColor
+import com.rideflow.presentation.workout.statusLabel
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    viewModel: SettingsViewModel = koinViewModel()
+    viewModel: SettingsViewModel = koinViewModel(),
+    // Só leitura do estado de ligação, para mostrar "Ligado / A ligar / Erro" junto de cada sensor.
+    sensorRepository: SensorRepository = koinInject()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var showScanDialog by remember { mutableStateOf(false) }
+    val hrState by sensorRepository.heartRateState.collectAsState()
+    val bikeState by sensorRepository.bikeState.collectAsState()
+    // Alvo do diálogo de pesquisa (null = fechado). Guardado localmente porque o ViewModel
+    // limpa `scanningFor` quando a pesquisa pára.
+    var scanTarget by remember { mutableStateOf<ScannerTarget?>(null) }
 
-    Scaffold { padding ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Saved Devices Info
-            DeviceSettingRow(
-                label = "Heart Rate Sensor",
-                deviceName = uiState.heartRateDeviceName,
-                onScan = { 
-                    viewModel.onIntent(SettingsIntent.StartScan(ScannerTarget.HeartRate))
-                    showScanDialog = true
-                },
-                onDisconnect = { viewModel.onIntent(SettingsIntent.DisconnectDevice(ScannerTarget.HeartRate)) }
-            )
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            DeviceSettingRow(
-                label = "Bike / FTMS",
-                deviceName = uiState.bikeDeviceName,
-                onScan = { 
-                    viewModel.onIntent(SettingsIntent.StartScan(ScannerTarget.Bike))
-                    showScanDialog = true
-                },
-                onDisconnect = { viewModel.onIntent(SettingsIntent.DisconnectDevice(ScannerTarget.Bike)) }
-            )
+    fun startScan(target: ScannerTarget) {
+        viewModel.onIntent(SettingsIntent.StartScan(target))
+        scanTarget = target
+    }
+
+    Scaffold(topBar = { TopAppBar(title = { Text("Settings") }) }) { padding ->
+        Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
+            Column(
+                Modifier
+                    .widthIn(max = 720.dp)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
+            ) {
+                SectionHeader("Sensors")
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                    shape = MaterialTheme.shapes.large
+                ) {
+                    SensorSettingRow(
+                        label = "Heart rate sensor",
+                        icon = Icons.Filled.Favorite,
+                        iconTint = MaterialTheme.colorScheme.tertiary,
+                        deviceName = uiState.heartRateDeviceName,
+                        connection = hrState,
+                        onPair = { startScan(ScannerTarget.HeartRate) },
+                        onReconnect = uiState.heartRateDeviceAddress?.let { address ->
+                            { viewModel.onIntent(SettingsIntent.ConnectDevice(uiState.heartRateDeviceName, address, ScannerTarget.HeartRate)) }
+                        },
+                        onUnpair = { viewModel.onIntent(SettingsIntent.DisconnectDevice(ScannerTarget.HeartRate)) }
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    SensorSettingRow(
+                        label = "Smart bike (FTMS)",
+                        icon = Icons.AutoMirrored.Filled.DirectionsBike,
+                        iconTint = MaterialTheme.colorScheme.primary,
+                        deviceName = uiState.bikeDeviceName,
+                        connection = bikeState,
+                        onPair = { startScan(ScannerTarget.Bike) },
+                        onReconnect = uiState.bikeDeviceAddress?.let { address ->
+                            { viewModel.onIntent(SettingsIntent.ConnectDevice(uiState.bikeDeviceName, address, ScannerTarget.Bike)) }
+                        },
+                        onUnpair = { viewModel.onIntent(SettingsIntent.DisconnectDevice(ScannerTarget.Bike)) }
+                    )
+                }
+                Text(
+                    "Paired sensors reconnect automatically when the app starts.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
         }
     }
 
-    if (showScanDialog) {
-        val targetText = if (uiState.scanningFor is ScannerTarget.HeartRate) "Heart Rate Sensor" else "Bike / FTMS"
-        AlertDialog(
-            onDismissRequest = { 
+    scanTarget?.let { target ->
+        ScanDialog(
+            target = target,
+            uiState = uiState,
+            onSelect = { name, address ->
+                viewModel.onIntent(SettingsIntent.ConnectDevice(name, address, target))
+                scanTarget = null
+            },
+            onDismiss = {
                 viewModel.onIntent(SettingsIntent.StopScan)
-                showScanDialog = false 
-            },
-            title = { Text("Scanning for $targetText") },
-            text = {
-                val devicesWithName = uiState.discoveredDevices.filter { it.name != null || it.peripheralName != null }
-                Column(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
-                    if (devicesWithName.isEmpty()) {
-                        Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
-                        }
-                    } else {
-                        LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                            items(devicesWithName) { device ->
-                                val name = device.name ?: device.peripheralName!!
-                                ListItem(
-                                    headlineContent = { Text(name) },
-                                    supportingContent = { Text(device.identifier.toString()) },
-                                    modifier = Modifier.clickable {
-                                        uiState.scanningFor?.let { target ->
-                                            viewModel.onIntent(SettingsIntent.ConnectDevice(name, device.identifier.toString(), target))
-                                            showScanDialog = false
-                                        }
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { 
-                    viewModel.onIntent(SettingsIntent.StopScan)
-                    showScanDialog = false 
-                }) {
-                    Text("Cancel")
-                }
+                scanTarget = null
             }
         )
     }
 }
 
 @Composable
-fun DeviceSettingRow(
+private fun SectionHeader(title: String) {
+    Text(
+        title,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 16.dp, bottom = 8.dp).semantics { heading() }
+    )
+}
+
+@Composable
+private fun SensorSettingRow(
     label: String,
+    icon: ImageVector,
+    iconTint: Color,
     deviceName: String?,
-    onScan: () -> Unit,
-    onDisconnect: () -> Unit
+    connection: SensorConnectionState,
+    onPair: () -> Unit,
+    onReconnect: (() -> Unit)?,
+    onUnpair: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp).fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(40.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(22.dp))
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text(label, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    text = deviceName ?: "Not paired", 
-                    style = MaterialTheme.typography.bodyLarge, 
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                    color = if (deviceName == null) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary
+                    deviceName ?: "Not paired",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (deviceName != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                        Box(Modifier.size(8.dp).background(connection.statusColor(), CircleShape))
+                        Spacer(Modifier.width(6.dp))
+                        Text(connection.statusLabel(), style = MaterialTheme.typography.labelMedium, color = connection.statusColor())
+                    }
+                }
             }
             if (deviceName == null) {
-                Button(onClick = onScan, shape = MaterialTheme.shapes.medium) { Text("Pair") }
-            } else {
-                TextButton(onClick = onDisconnect) { Text("Unpair", color = MaterialTheme.colorScheme.error) }
+                Button(onClick = onPair) {
+                    Icon(Icons.AutoMirrored.Filled.BluetoothSearching, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Pair")
+                }
+            }
+        }
+
+        if (deviceName != null) {
+            Row(
+                Modifier.fillMaxWidth().padding(top = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+            ) {
+                val disconnected = connection is SensorConnectionState.Disconnected || connection is SensorConnectionState.Error
+                if (onReconnect != null && disconnected) {
+                    FilledTonalButton(onClick = onReconnect) {
+                        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Reconnect")
+                    }
+                }
+                OutlinedButton(
+                    onClick = onUnpair,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Unpair") }
             }
         }
     }
+}
+
+@Composable
+private fun ScanDialog(
+    target: ScannerTarget,
+    uiState: SettingsUiState,
+    onSelect: (name: String, address: String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val targetText = if (target is ScannerTarget.HeartRate) "heart rate sensor" else "smart bike"
+    val devices = uiState.discoveredDevices.filter { it.name != null || it.peripheralName != null }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.AutoMirrored.Filled.BluetoothSearching, contentDescription = null) },
+        title = { Text("Pair $targetText") },
+        text = {
+            Column(Modifier.fillMaxWidth()) {
+                if (uiState.isScanning) {
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "Searching for nearby devices. Make sure the $targetText is awake.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                } else if (devices.isEmpty()) {
+                    Text(
+                        "Scanning stopped. Check that Bluetooth is on and the app has permission to use it.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                if (devices.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
+                        items(devices, key = { it.identifier.toString() }) { device ->
+                            val name = device.name ?: device.peripheralName.orEmpty()
+                            val address = device.identifier.toString()
+                            ListItem(
+                                headlineContent = { Text(name) },
+                                supportingContent = { Text(address) },
+                                leadingContent = { Icon(Icons.Filled.Bluetooth, contentDescription = null) },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                modifier = Modifier.clickable { onSelect(name, address) }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
