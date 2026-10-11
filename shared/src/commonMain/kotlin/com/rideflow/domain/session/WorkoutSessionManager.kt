@@ -2,6 +2,7 @@ package com.rideflow.domain.session
 
 import com.rideflow.domain.model.WorkoutSession
 import com.rideflow.domain.repository.SensorRepository
+import com.rideflow.domain.repository.WorkoutRepository
 import com.rideflow.domain.usecase.RecordSampleUseCase
 import com.rideflow.domain.usecase.StartWorkoutUseCase
 import com.rideflow.domain.usecase.StopWorkoutUseCase
@@ -35,7 +36,8 @@ class WorkoutSessionManager(
     private val recordSampleUseCase: RecordSampleUseCase,
     private val stopWorkoutUseCase: StopWorkoutUseCase,
     private val sensorRepository: SensorRepository,
-    private val keepAlive: WorkoutKeepAlive
+    private val keepAlive: WorkoutKeepAlive,
+    private val workoutRepository: WorkoutRepository
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -48,6 +50,29 @@ class WorkoutSessionManager(
 
     /** Serializa start/stop: dois toques rápidos no botão não podem abrir dois treinos. */
     private val lifecycleMutex = Mutex()
+
+    init {
+        // Se o processo morreu a meio de um treino (ou o stop falhou), o Train ficou sem resumo
+        // (0s, 0km no histórico) apesar de ter samples. Fecha-os agora, a partir dos samples.
+        scope.launch {
+            lifecycleMutex.withLock {
+                // Sob o mutex: um start() que tenha ganho a corrida já pôs o seu id em _session,
+                // e esse treino está vivo — não é para fechar.
+                val activeId = _session.value?.trainId
+                runCatching { recoverUnfinished(activeId) }
+                    .onFailure { Napier.e(tag = TAG, throwable = it) { "Workout recovery failed" } }
+            }
+        }
+    }
+
+    private suspend fun recoverUnfinished(activeId: Long?) {
+        workoutRepository.getUnfinishedTrainIds()
+            .filter { it != activeId }
+            .forEach { id ->
+                stopWorkoutUseCase(id)
+                Napier.i(tag = TAG) { "Recovered unfinished workout $id" }
+            }
+    }
 
     suspend fun start() = lifecycleMutex.withLock {
         if (sessionJob?.isActive == true) {

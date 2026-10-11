@@ -89,6 +89,9 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
+        getByName("androidHostTest").dependencies {
+            implementation(libs.sqldelight.sqlite.driver)
+        }
     }
 }
 
@@ -96,6 +99,12 @@ sqldelight {
     databases {
         create("RideFlowDb") {
             packageName.set("com.rideflow.db")
+            // Cada alteração ao schema precisa de um ficheiro N.sqm (migração de N para N+1) em
+            // sqldelight/com/rideflow/db/migrations. O N.db em `databases/` é o snapshot da versão N
+            // (gerado com generateCommonMainRideFlowDbSchema *antes* de mexer no .sq) e o
+            // verifyMigrations falha o build se as migrações não reproduzirem o .sq actual.
+            schemaOutputDirectory.set(file("src/commonMain/sqldelight/databases"))
+            verifyMigrations.set(true)
         }
     }
 }
