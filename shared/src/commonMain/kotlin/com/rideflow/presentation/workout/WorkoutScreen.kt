@@ -3,7 +3,19 @@ package com.rideflow.presentation.workout
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import com.rideflow.domain.model.Train
+import com.rideflow.presentation.history.SummaryStat
+import com.rideflow.presentation.history.statsLine
+import com.rideflow.util.formatDate
+import com.rideflow.util.formatDistance
+import com.rideflow.util.formatTimeOfDay
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -31,9 +43,12 @@ import org.koin.compose.viewmodel.koinViewModel
 private const val RESISTANCE_STEP = 10
 private const val RESISTANCE_MAX = 100
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkoutScreen(
     onWorkoutActiveChanged: (Boolean) -> Unit = {},
+    onOpenSettings: () -> Unit = {},
+    onOpenRide: (Long) -> Unit = {},
     viewModel: WorkoutViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -44,7 +59,7 @@ fun WorkoutScreen(
         if (!uiState.isWorkoutActive) confirmStop = false
     }
 
-    Scaffold { padding ->
+    Scaffold(topBar = { if (!uiState.isWorkoutActive) TopAppBar(title = { Text("Ride") }) }) { padding ->
         val contentModifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)
         if (uiState.isWorkoutActive) {
             ActiveWorkout(
@@ -58,6 +73,8 @@ fun WorkoutScreen(
             IdleWorkout(
                 uiState = uiState,
                 onStart = { viewModel.onIntent(WorkoutIntent.StartWorkout) },
+                onOpenSettings = onOpenSettings,
+                onOpenRide = onOpenRide,
                 modifier = contentModifier
             )
         }
@@ -92,42 +109,147 @@ fun WorkoutScreen(
 // Antes do treino
 // ---------------------------------------------------------------------------------------------
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun IdleWorkout(uiState: WorkoutUiState, onStart: () -> Unit, modifier: Modifier = Modifier) {
+private fun IdleWorkout(
+    uiState: WorkoutUiState,
+    onStart: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenRide: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
     BoxWithConstraints(modifier) {
-        val landscape = maxWidth > maxHeight
+        val info: @Composable (Modifier) -> Unit = { m ->
+            Column(m.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+                Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                    Column {
+                        SensorRow(
+                            label = "Bike", deviceName = uiState.bikeDeviceName, state = uiState.bikeConnection,
+                            value = uiState.power?.toString(), unit = "W", accent = MaterialTheme.colorScheme.primary,
+                            onPair = onOpenSettings
+                        )
+                        HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        SensorRow(
+                            label = "Heart rate", deviceName = uiState.heartRateDeviceName, state = uiState.heartRateConnection,
+                            value = uiState.heartRate?.toString(), unit = "bpm", accent = MaterialTheme.colorScheme.tertiary,
+                            onPair = onOpenSettings
+                        )
+                    }
+                }
 
-        val info: @Composable ColumnScope.() -> Unit = {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SensorStatusPill("Heart rate", uiState.heartRateConnection, showStatus = true)
-                SensorStatusPill("Bike", uiState.bikeConnection, showStatus = true)
-            }
-            if (uiState.bikeConnection !is SensorConnectionState.Connected) {
-                Text(
-                    "Bike not connected. Pair it in Settings to record power and speed.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            // Pré-visualização dos sensores para confirmar que estão a enviar dados antes de arrancar.
-            Row(Modifier.fillMaxWidth().height(120.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                PowerTile(uiState, Modifier.weight(1f).fillMaxHeight())
-                HeartRateTile(uiState, Modifier.weight(1f).fillMaxHeight())
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SectionTitle("Last 7 days")
+                    Row(Modifier.fillMaxWidth()) {
+                        SummaryStat("Rides", uiState.weekRides.toString(), Modifier.weight(1f))
+                        SummaryStat("Time", formatDuration(uiState.weekSeconds), Modifier.weight(1f))
+                        SummaryStat("Distance", formatDistance(uiState.weekKm), Modifier.weight(1f))
+                    }
+                }
+
+                uiState.lastRide?.let { ride ->
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SectionTitle("Last ride")
+                        LastRideRow(ride, onClick = { onOpenRide(ride.id) })
+                    }
+                }
             }
         }
 
-        if (landscape) {
+        if (maxWidth > maxHeight) {
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp), content = info)
+                info(Modifier.weight(1f).fillMaxHeight())
                 StartButton(onStart, Modifier.weight(1f))
             }
         } else {
-            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                info()
-                Spacer(Modifier.weight(1f))
+            Column(Modifier.fillMaxSize()) {
+                info(Modifier.weight(1f))
+                Spacer(Modifier.height(16.dp))
                 StartButton(onStart, Modifier.fillMaxWidth())
             }
+        }
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.semantics { heading() }
+    )
+}
+
+/** Sensor emparelhado: nome + valor ao vivo (ou estado da ligação). Não emparelhado: botão para as Definições. */
+@Composable
+private fun SensorRow(
+    label: String,
+    deviceName: String?,
+    state: SensorConnectionState,
+    value: String?,
+    unit: String,
+    accent: Color,
+    onPair: () -> Unit
+) {
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                deviceName ?: "Not paired",
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        when {
+            deviceName == null -> FilledTonalButton(onClick = onPair) { Text("Pair") }
+            state is SensorConnectionState.Connected && value != null -> Row(
+                Modifier.clearAndSetSemantics { contentDescription = "$label $value $unit" },
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Text(value, style = MaterialTheme.typography.headlineMedium, color = accent, fontWeight = FontWeight.SemiBold)
+                Text(
+                    " $unit",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+            }
+            else -> Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(8.dp).background(state.statusColor(), CircleShape))
+                Spacer(Modifier.width(6.dp))
+                Text(state.statusLabel(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LastRideRow(ride: Train, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(ride.name ?: formatDate(ride.date), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    if (ride.name != null) "${formatDate(ride.date)} · ${formatTimeOfDay(ride.date)}" else formatTimeOfDay(ride.date),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(ride.statsLine(), style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+            }
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

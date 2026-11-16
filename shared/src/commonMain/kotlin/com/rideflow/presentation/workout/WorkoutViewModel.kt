@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.rideflow.domain.model.SensorConnectionState
 import com.rideflow.domain.repository.SensorRepository
 import com.rideflow.domain.session.WorkoutSessionManager
+import com.rideflow.domain.usecase.GetWorkoutHistoryUseCase
 import com.russhwolf.settings.Settings
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,9 +16,13 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
 
 private const val KEY_HR_ADDRESS = "hr_device_address"
 private const val KEY_BIKE_ADDRESS = "bike_device_address"
+private const val KEY_HR_NAME = "hr_device_name"
+private const val KEY_BIKE_NAME = "bike_device_name"
 
 /**
  * Casca fina: projeta o estado do [WorkoutSessionManager] e dos sensores para a UI e encaminha
@@ -27,7 +32,8 @@ private const val KEY_BIKE_ADDRESS = "bike_device_address"
 class WorkoutViewModel(
     private val sensorRepository: SensorRepository,
     private val sessionManager: WorkoutSessionManager,
-    private val settings: Settings
+    private val settings: Settings,
+    private val getHistory: GetWorkoutHistoryUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WorkoutUiState())
@@ -36,7 +42,25 @@ class WorkoutViewModel(
     init {
         observeSession()
         observeSensors()
+        observeHistory()
         autoConnectDevices()
+    }
+
+    private fun observeHistory() {
+        getHistory()
+            .onEach { trains ->
+                val since = Clock.System.now() - 7.days
+                val week = trains.filter { it.date >= since }
+                _uiState.update {
+                    it.copy(
+                        lastRide = trains.maxByOrNull { t -> t.date },
+                        weekRides = week.size,
+                        weekSeconds = week.sumOf { t -> t.duration },
+                        weekKm = week.sumOf { t -> t.distance }
+                    )
+                }
+            }
+            .launchIn(viewModelScope)
     }
 
     private fun observeSession() {
@@ -70,6 +94,7 @@ class WorkoutViewModel(
                 _uiState.update {
                     it.copy(
                         heartRateConnection = state,
+                        heartRateDeviceName = settings.getStringOrNull(KEY_HR_NAME),
                         heartRate = if (state is SensorConnectionState.Connected) it.heartRate else null
                     )
                 }
@@ -81,6 +106,7 @@ class WorkoutViewModel(
                 _uiState.update {
                     it.copy(
                         bikeConnection = state,
+                        bikeDeviceName = settings.getStringOrNull(KEY_BIKE_NAME),
                         power = if (state is SensorConnectionState.Connected) it.power else null,
                         speed = if (state is SensorConnectionState.Connected) it.speed else null
                     )

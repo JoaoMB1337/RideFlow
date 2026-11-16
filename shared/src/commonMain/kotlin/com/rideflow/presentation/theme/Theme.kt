@@ -13,10 +13,10 @@ import androidx.compose.ui.text.font.FontWeight
 // Superfícies neutras (sem tinta colorida) e um único acento. As cores das métricas
 // (HR = tertiary, velocidade = secondary) só aparecem nos números e nos gráficos.
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFFF2B544),
-    onPrimary = Color(0xFF3A2600),
-    primaryContainer = Color(0xFF4A3500),
-    onPrimaryContainer = Color(0xFFFFDEA6),
+    primary = Color(0xFFFF9A52),
+    onPrimary = Color(0xFF4A1A00),
+    primaryContainer = Color(0xFF5A2A0A),
+    onPrimaryContainer = Color(0xFFFFDBC9),
     secondary = Color(0xFF8DB8F0),
     onSecondary = Color(0xFF00315C),
     secondaryContainer = Color(0xFF2A2F36),
@@ -41,10 +41,10 @@ private val DarkColors = darkColorScheme(
 )
 
 private val LightColors = lightColorScheme(
-    primary = Color(0xFF805A00),
+    primary = Color(0xFFC4500F),
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFFFE3B0),
-    onPrimaryContainer = Color(0xFF2A1A00),
+    primaryContainer = Color(0xFFFFDBC9),
+    onPrimaryContainer = Color(0xFF341000),
     secondary = Color(0xFF2B5C99),
     onSecondary = Color.White,
     secondaryContainer = Color(0xFFE4E8EE),

@@ -1,6 +1,7 @@
 package com.rideflow.presentation.workout
 
 import com.rideflow.domain.model.SensorConnectionState
+import com.rideflow.domain.model.Train
 
 data class WorkoutUiState(
     val isWorkoutActive: Boolean = false,
@@ -12,7 +13,13 @@ data class WorkoutUiState(
     val speed: Double? = null,
     val resistance: Int = 10,
     val heartRateConnection: SensorConnectionState = SensorConnectionState.Disconnected,
-    val bikeConnection: SensorConnectionState = SensorConnectionState.Disconnected
+    val bikeConnection: SensorConnectionState = SensorConnectionState.Disconnected,
+    val heartRateDeviceName: String? = null,
+    val bikeDeviceName: String? = null,
+    val lastRide: Train? = null,
+    val weekRides: Int = 0,
+    val weekSeconds: Long = 0,
+    val weekKm: Double = 0.0
 )
 
 sealed class WorkoutIntent {

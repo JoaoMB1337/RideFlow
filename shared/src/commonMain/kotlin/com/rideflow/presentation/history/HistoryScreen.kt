@@ -155,6 +155,14 @@ fun EmptyHistoryPlaceholder() {
     }
 }
 
+/** Ex.: "45:12  ·  18.3km  ·  182 W  ·  141 bpm" (métricas sem dados ficam de fora). */
+fun Train.statsLine(): String = listOfNotNull(
+    formatDuration(duration),
+    formatDistance(distance),
+    avgPower.takeIf { it > 0 }?.let { "$it W" },
+    avgHeartRate.takeIf { it > 0 }?.let { "$it bpm" },
+).joinToString("  ·  ")
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TrainItem(
@@ -167,12 +175,6 @@ fun TrainItem(
     onDelete: () -> Unit
 ) {
     val date = formatDate(train.date)
-    val stats = listOfNotNull(
-        formatDuration(train.duration),
-        formatDistance(train.distance),
-        train.avgPower.takeIf { it > 0 }?.let { "$it W" },
-        train.avgHeartRate.takeIf { it > 0 }?.let { "$it bpm" },
-    ).joinToString("  ·  ")
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -193,7 +195,7 @@ fun TrainItem(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(6.dp))
-            Text(stats, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+            Text(train.statsLine(), style = MaterialTheme.typography.bodyMedium, maxLines = 1)
         }
         if (!isSelectionMode) {
             RideOverflowMenu(date, onShare, onDelete)

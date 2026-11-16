@@ -9,6 +9,8 @@ import androidx.compose.material.icons.automirrored.filled.DirectionsBike
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -59,6 +61,11 @@ fun App() {
                                 icon = { Icon(tab.icon, contentDescription = null) },
                                 label = { Text(tab.label) },
                                 selected = selectedRoute == tab.screen.route,
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                                ),
                                 onClick = {
                                     navController.navigate(tab.screen.route) {
                                         popUpTo(navController.graph.startDestinationId)
@@ -84,7 +91,14 @@ fun App() {
             ) {
                 composable(Screen.Workout.route) {
                     WorkoutScreen(
-                        onWorkoutActiveChanged = { isWorkoutActive = it }
+                        onWorkoutActiveChanged = { isWorkoutActive = it },
+                        onOpenSettings = {
+                            navController.navigate(Screen.Settings.route) {
+                                popUpTo(navController.graph.startDestinationId)
+                                launchSingleTop = true
+                            }
+                        },
+                        onOpenRide = { navController.navigate(Screen.TrainDetail.createRoute(it)) }
                     )
                 }
                 composable(Screen.History.route) {

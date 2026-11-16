@@ -6,7 +6,6 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.sqldelight)
-    alias(libs.plugins.kotlinxSerialization)
 }
 
 kotlin {
@@ -28,23 +27,13 @@ kotlin {
        compilerOptions {
            jvmTarget = JvmTarget.JVM_11
        }
-       androidResources {
-           enable = true
-       }
        withHostTest {
            isIncludeAndroidResources = true
-       }
-       withDeviceTestBuilder {
-           sourceSetTreeName = "test"
-       }.configure {
-           instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
        }
     }
     
     sourceSets {
         androidMain.dependencies {
-            implementation(libs.compose.uiToolingPreview)
-            implementation(libs.compose.uiTooling)
             implementation(libs.sqldelight.android.driver)
         }
         commonMain.dependencies {
@@ -52,8 +41,6 @@ kotlin {
             implementation(libs.compose.foundation)
             implementation(libs.compose.material3)
             implementation(libs.compose.ui)
-            implementation(libs.compose.components.resources)
-            implementation(libs.compose.uiToolingPreview)
             implementation(libs.compose.icons)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
@@ -67,12 +54,10 @@ kotlin {
             implementation(libs.sqldelight.coroutines)
 
             // Preferences
-            implementation(libs.multiplatform.settings)
             implementation(libs.multiplatform.settings.no.arg)
 
-            // Coroutines & Serialization
+            // Coroutines
             implementation(libs.kotlinx.coroutines.core)
-            implementation(libs.kotlinx.serialization.json)
 
             // Dependency Injection
             implementation(libs.koin.core)
@@ -107,8 +92,4 @@ sqldelight {
             verifyMigrations.set(true)
         }
     }
-}
-
-dependencies {
-    androidRuntimeClasspath(libs.compose.uiTooling)
 }
