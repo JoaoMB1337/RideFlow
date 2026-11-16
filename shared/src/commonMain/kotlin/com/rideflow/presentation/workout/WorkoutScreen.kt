@@ -7,25 +7,18 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.filled.Route
-import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.keepScreenOn
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -104,11 +97,9 @@ fun WorkoutScreen(
 private fun IdleWorkout(uiState: WorkoutUiState, onStart: () -> Unit, modifier: Modifier = Modifier) {
     BoxWithConstraints(modifier) {
         val landscape = maxWidth > maxHeight
-        val buttonSize = minOf(200.dp, if (landscape) maxHeight * 0.7f else maxHeight * 0.35f)
 
         val info: @Composable ColumnScope.() -> Unit = {
-            Text("Ready to ride", style = MaterialTheme.typography.headlineMedium)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SensorStatusPill("Heart rate", uiState.heartRateConnection, showStatus = true)
                 SensorStatusPill("Bike", uiState.bikeConnection, showStatus = true)
             }
@@ -129,34 +120,26 @@ private fun IdleWorkout(uiState: WorkoutUiState, onStart: () -> Unit, modifier: 
         if (landscape) {
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp), content = info)
-                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    StartButton(onStart, buttonSize)
-                }
+                StartButton(onStart, Modifier.weight(1f))
             }
         } else {
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 info()
-                Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                    StartButton(onStart, buttonSize)
-                }
+                Spacer(Modifier.weight(1f))
+                StartButton(onStart, Modifier.fillMaxWidth())
             }
         }
     }
 }
 
 @Composable
-private fun StartButton(onClick: () -> Unit, size: Dp) {
+private fun StartButton(onClick: () -> Unit, modifier: Modifier) {
     Button(
         onClick = onClick,
-        shape = CircleShape,
-        contentPadding = PaddingValues(0.dp),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
-        modifier = Modifier.size(size)
+        shape = MaterialTheme.shapes.medium,
+        modifier = modifier.height(72.dp)
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(size * 0.3f))
-            Text("START", style = MaterialTheme.typography.headlineMedium, fontWeight = MaterialTheme.typography.displayLarge.fontWeight)
-        }
+        Text("Start ride", style = MaterialTheme.typography.titleLarge)
     }
 }
 
@@ -185,16 +168,12 @@ private fun ActiveWorkout(
             Row(m.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
                 MetricTile(
                     label = "Speed", value = uiState.speed?.let(::formatSpeedValue) ?: "--", unit = "km/h",
-                    icon = Icons.Filled.Speed,
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    accent = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.weight(1f).fillMaxHeight()
                 )
                 MetricTile(
                     label = "Distance", value = distance, unit = distanceUnit,
-                    icon = Icons.Filled.Route,
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    accent = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f).fillMaxHeight()
                 )
             }
@@ -230,12 +209,9 @@ private fun ActiveWorkout(
 @Composable
 private fun LiveHeader(uiState: WorkoutUiState) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(10.dp).background(MaterialTheme.colorScheme.error, CircleShape))
-        Spacer(Modifier.width(8.dp))
-        Text("LIVE", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.error)
         Spacer(Modifier.weight(1f))
         SensorStatusPill("HR", uiState.heartRateConnection)
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(16.dp))
         SensorStatusPill("Bike", uiState.bikeConnection)
     }
 }
@@ -251,18 +227,14 @@ private fun ElapsedTime(seconds: Long, modifier: Modifier) {
 @Composable
 private fun PowerTile(uiState: WorkoutUiState, modifier: Modifier) = MetricTile(
     label = "Power", value = uiState.power?.toString() ?: "--", unit = "W",
-    icon = Icons.Filled.Bolt,
-    containerColor = MaterialTheme.colorScheme.primaryContainer,
-    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    accent = MaterialTheme.colorScheme.primary,
     modifier = modifier
 )
 
 @Composable
 private fun HeartRateTile(uiState: WorkoutUiState, modifier: Modifier) = MetricTile(
     label = "Heart rate", value = uiState.heartRate?.toString() ?: "--", unit = "bpm",
-    icon = Icons.Filled.Favorite,
-    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+    accent = MaterialTheme.colorScheme.tertiary,
     modifier = modifier
 )
 
@@ -271,9 +243,7 @@ private fun MetricTile(
     label: String,
     value: String,
     unit: String,
-    icon: ImageVector,
-    containerColor: Color,
-    contentColor: Color,
+    accent: Color,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -281,25 +251,17 @@ private fun MetricTile(
         modifier = modifier.clearAndSetSemantics {
             contentDescription = if (value == "--") "$label: no data" else "$label $value $unit"
         },
-        shape = MaterialTheme.shapes.extraLarge,
-        color = containerColor,
-        contentColor = contentColor
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainer
     ) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(label.uppercase(), style = MaterialTheme.typography.labelLarge)
+            Row {
+                Text(label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                Text(unit, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                AutoSizeNumber(value, contentColor, Modifier.fillMaxWidth())
+                AutoSizeNumber(value, accent, Modifier.fillMaxWidth())
             }
-            Text(
-                unit,
-                style = MaterialTheme.typography.titleMedium,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
         }
     }
 }
@@ -320,8 +282,8 @@ private fun AutoSizeNumber(text: String, color: Color, modifier: Modifier = Modi
 @Composable
 private fun ResistanceControl(level: Int, onLevelChange: (Int) -> Unit) {
     Surface(
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -336,7 +298,7 @@ private fun ResistanceControl(level: Int, onLevelChange: (Int) -> Unit) {
                 Modifier.weight(1f).semantics(mergeDescendants = true) {},
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("RESISTANCE", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Resistance", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(level.toString(), style = MaterialTheme.typography.displaySmall)
             }
             FilledTonalIconButton(
@@ -359,11 +321,9 @@ private fun FinishButton(onClick: () -> Unit) {
             containerColor = MaterialTheme.colorScheme.error,
             contentColor = MaterialTheme.colorScheme.onError
         ),
-        shape = MaterialTheme.shapes.large
+        shape = MaterialTheme.shapes.medium
     ) {
-        Icon(Icons.Filled.Stop, contentDescription = null)
-        Spacer(Modifier.width(8.dp))
-        Text("FINISH RIDE", style = MaterialTheme.typography.titleMedium)
+        Text("Finish ride", style = MaterialTheme.typography.titleMedium)
     }
 }
 
@@ -389,18 +349,16 @@ fun SensorConnectionState.statusLabel(): String = when (this) {
 /** Indicador compacto: ponto colorido + nome (e, opcionalmente, o estado por extenso). */
 @Composable
 fun SensorStatusPill(label: String, state: SensorConnectionState, showStatus: Boolean = false) {
-    Surface(
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = Modifier.clearAndSetSemantics { contentDescription = "$label: ${state.statusLabel()}" }
+    Row(
+        Modifier.clearAndSetSemantics { contentDescription = "$label: ${state.statusLabel()}" },
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(10.dp).background(state.statusColor(), CircleShape))
-            Spacer(Modifier.width(6.dp))
-            Text(
-                if (showStatus) "$label · ${state.statusLabel()}" else label,
-                style = MaterialTheme.typography.labelMedium
-            )
-        }
+        Box(Modifier.size(8.dp).background(state.statusColor(), CircleShape))
+        Spacer(Modifier.width(6.dp))
+        Text(
+            if (showStatus) "$label · ${state.statusLabel()}" else label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

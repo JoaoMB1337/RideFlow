@@ -1,6 +1,5 @@
 package com.rideflow.presentation.history.detail
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -8,22 +7,28 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Speed
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.input.pointer.pointerInput
+import com.rideflow.util.formatSpeedValue
+import kotlin.math.roundToInt
 import com.rideflow.domain.model.Train
 import com.rideflow.domain.model.TrainingData
 import com.rideflow.util.formatDate
@@ -95,11 +100,6 @@ fun TrainDetailScreen(
                         TrainStatsTable(train)
                     }
 
-                    Text(
-                        "Charts",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(top = 8.dp, start = 4.dp)
-                    )
 
                     // Zonas de HR calculadas a partir do perfil do utilizador (fallback para defaults se não houver perfil)
                     val maxHr = uiState.userMaxHeartRate ?: 190
@@ -108,7 +108,8 @@ fun TrainDetailScreen(
                     val charts: List<@Composable (Modifier) -> Unit> = listOf(
                         { m ->
                             ChartContainer(
-                                label = "Heart rate (bpm)",
+                                label = "Heart rate",
+                                unit = "bpm",
                                 samples = uiState.samples,
                                 valueSelector = { it.heartRate?.toDouble() },
                                 color = MaterialTheme.colorScheme.tertiary,
@@ -119,7 +120,8 @@ fun TrainDetailScreen(
                         },
                         { m ->
                             ChartContainer(
-                                label = "Power (W)",
+                                label = "Power",
+                                unit = "W",
                                 samples = uiState.samples,
                                 valueSelector = { it.power?.toDouble() },
                                 color = MaterialTheme.colorScheme.primary,
@@ -129,7 +131,9 @@ fun TrainDetailScreen(
                         },
                         { m ->
                             ChartContainer(
-                                label = "Speed (km/h)",
+                                label = "Speed",
+                                unit = "km/h",
+                                format = ::formatSpeedValue,
                                 samples = uiState.samples,
                                 valueSelector = { it.speed?.toDouble() },
                                 color = MaterialTheme.colorScheme.secondary,
@@ -139,6 +143,7 @@ fun TrainDetailScreen(
                         { m ->
                             ChartContainer(
                                 label = "Resistance",
+                                unit = "",
                                 samples = uiState.samples,
                                 valueSelector = { it.resistance?.toDouble() },
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -247,32 +252,23 @@ fun TrainDetailScreen(
 /** Cabeçalho: data/hora do treino + as duas métricas principais (duração e distância). */
 @Composable
 fun TrainSummaryCard(train: Train) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-        ),
-        shape = MaterialTheme.shapes.extraLarge
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Text(train.name ?: formatDate(train.date), style = MaterialTheme.typography.titleLarge)
-            Text(
-                if (train.name != null) "${formatDate(train.date)} · ${formatTimeOfDay(train.date)}"
-                else "Started at ${formatTimeOfDay(train.date)}",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(modifier = Modifier.fillMaxWidth()) {
-                SummaryItem(Modifier.weight(1f), "Duration", formatDuration(train.duration))
-                SummaryItem(Modifier.weight(1f), "Distance", formatDistance(train.distance))
-            }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(train.name ?: formatDate(train.date), style = MaterialTheme.typography.headlineSmall)
+        Text(
+            if (train.name != null) "${formatDate(train.date)} · ${formatTimeOfDay(train.date)}"
+            else "Started at ${formatTimeOfDay(train.date)}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            SummaryItem(Modifier.weight(1f), "Duration", formatDuration(train.duration))
+            SummaryItem(Modifier.weight(1f), "Distance", formatDistance(train.distance))
+            SummaryItem(Modifier.weight(1f), "Calories", "${train.calories} kcal")
+        }
+        train.notes?.let {
             Spacer(modifier = Modifier.height(12.dp))
-            SummaryItem(Modifier, "Calories", "${train.calories} kcal")
-            train.notes?.let {
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(it, style = MaterialTheme.typography.bodyMedium)
-            }
+            Text(it, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -280,34 +276,32 @@ fun TrainSummaryCard(train: Train) {
 @Composable
 fun SummaryItem(modifier: Modifier, label: String, value: String) {
     Column(modifier = modifier.clearAndSetSemantics { contentDescription = "$label $value" }) {
-        Text(label.uppercase(), style = MaterialTheme.typography.labelMedium)
-        Text(value, style = MaterialTheme.typography.displaySmall, maxLines = 1)
+        Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 /** Tabela média / máximo por métrica. */
 @Composable
 private fun TrainStatsTable(train: Train) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-        shape = MaterialTheme.shapes.large
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Column(modifier = Modifier.padding(vertical = 8.dp)) {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
                 Spacer(Modifier.weight(1.4f))
-                TableHeader("AVG", Modifier.weight(1f))
-                TableHeader("MAX", Modifier.weight(1f))
+                TableHeader("Avg", Modifier.weight(1f))
+                TableHeader("Max", Modifier.weight(1f))
             }
-            StatsRow(Icons.Default.Favorite, MaterialTheme.colorScheme.tertiary, "Heart rate",
+            StatsRow("Heart rate",
                 "${train.avgHeartRate} bpm", "${train.maxHeartRate} bpm")
-            StatsRow(Icons.Default.Bolt, MaterialTheme.colorScheme.primary, "Power",
+            StatsRow("Power",
                 "${train.avgPower} W", "${train.maxPower} W")
-            StatsRow(Icons.Default.Speed, MaterialTheme.colorScheme.secondary, "Speed",
+            StatsRow("Speed",
                 formatSpeed(train.avgSpeed), formatSpeed(train.maxSpeed))
-            StatsRow(Icons.Default.FitnessCenter, MaterialTheme.colorScheme.onSurfaceVariant, "Resistance",
+            StatsRow("Resistance",
                 "${train.avgResistance}", "${train.maxResistance}")
         }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
@@ -323,7 +317,7 @@ private fun TableHeader(text: String, modifier: Modifier) {
 }
 
 @Composable
-private fun StatsRow(icon: ImageVector, tint: Color, label: String, avg: String, max: String) {
+private fun StatsRow(label: String, avg: String, max: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -331,12 +325,8 @@ private fun StatsRow(icon: ImageVector, tint: Color, label: String, avg: String,
             .clearAndSetSemantics { contentDescription = "$label: average $avg, maximum $max" },
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(Modifier.weight(1.4f), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(label, style = MaterialTheme.typography.bodyLarge)
-        }
-        Text(avg, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1.4f))
+        Text(avg, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.weight(1f))
         Text(max, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.weight(1f))
@@ -345,147 +335,168 @@ private fun StatsRow(icon: ImageVector, tint: Color, label: String, avg: String,
 
 /**
  * Ponto de dados já resolvido para desenho: mantém o timestamp original
- * mesmo quando o valor vem de um sample com falha de sensor (null),
- * evitando o desalinhamento do eixo X que existia na versão anterior.
+ * mesmo quando o valor vem de um sample com falha de sensor (null).
  */
 private data class PlotPoint(val timeSeconds: Long, val value: Double)
 
+/**
+ * Gráfico ao estilo Garmin Connect: área preenchida sob a linha (por zonas na FC),
+ * linha tracejada da média, eixo Y "redondo" à direita e leitura do valor ao arrastar o dedo.
+ */
 @Composable
 fun ChartContainer(
     label: String,
+    unit: String,
     samples: List<TrainingData>,
     valueSelector: (TrainingData) -> Double?,
     color: Color,
     zones: List<ChartZone> = emptyList(),
     maxOverride: Double? = null,
     smoothingWindow: Int = 1, // 1 = sem suavização
+    format: (Double) -> String = { it.roundToInt().toString() },
     modifier: Modifier = Modifier
 ) {
     val gridColor = MaterialTheme.colorScheme.outlineVariant
     val axisColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val cursorColor = MaterialTheme.colorScheme.onSurface
+    val axisStyle = MaterialTheme.typography.labelSmall.copy(color = axisColor)
+
+    val rawPoints = remember(samples) {
+        samples.mapNotNull { sample -> valueSelector(sample)?.let { PlotPoint(sample.timestampOffset, it) } }
+    }
+    val points = remember(rawPoints, smoothingWindow) {
+        if (smoothingWindow <= 1) rawPoints else smoothMovingAverage(rawPoints, smoothingWindow)
+    }
+    val totalSeconds = samples.lastOrNull()?.timestampOffset?.coerceAtLeast(1L) ?: 1L
+    val avg = remember(rawPoints) { rawPoints.map { it.value }.average() }
+    val peak = remember(rawPoints) { rawPoints.maxOfOrNull { it.value } ?: 0.0 }
+    val axisMax = remember(points, maxOverride) { niceAxisMax(maxOverride ?: points.maxOfOrNull { it.value } ?: 1.0) }
+    var scrub by remember(points) { mutableStateOf<PlotPoint?>(null) }
+    val unitSuffix = if (unit.isEmpty()) "" else " $unit"
+
     Surface(
-        modifier = modifier.fillMaxWidth().height(220.dp),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerLow
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(10.dp).background(color, androidx.compose.foundation.shape.CircleShape))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(label, style = MaterialTheme.typography.titleSmall)
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                val current = scrub
+                if (current != null) {
+                    Text(
+                        "${formatDuration(current.timeSeconds)}   ${format(current.value)}$unitSuffix",
+                        style = MaterialTheme.typography.titleSmall, color = color, fontWeight = FontWeight.SemiBold
+                    )
+                } else if (rawPoints.isNotEmpty()) {
+                    Text(
+                        "Avg ${format(avg)}  ·  Max ${format(peak)}$unitSuffix",
+                        style = MaterialTheme.typography.bodySmall, color = axisColor
+                    )
+                }
             }
-            Spacer(modifier = Modifier.height(12.dp))
-            Box(modifier = Modifier.fillMaxSize()) {
+            Spacer(Modifier.height(12.dp))
 
-                // Pares (tempo, valor) — só os samples com valor não-nulo entram,
-                // mas o tempo real de cada ponto é preservado (fix do bug de alinhamento).
-                val rawPoints = remember(samples) {
-                    samples.mapNotNull { sample ->
-                        valueSelector(sample)?.let { PlotPoint(sample.timestampOffset, it) }
-                    }
+            if (points.isEmpty()) {
+                Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) {
+                    Text("No data recorded", style = MaterialTheme.typography.bodyMedium, color = axisColor)
                 }
+                return@Column
+            }
 
-                val plotPoints = remember(rawPoints, smoothingWindow) {
-                    if (smoothingWindow <= 1) rawPoints else smoothMovingAverage(rawPoints, smoothingWindow)
-                }
-
-                val totalDurationSeconds = remember(samples) { samples.lastOrNull()?.timestampOffset ?: 0L }
-
-                if (plotPoints.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No data recorded", style = MaterialTheme.typography.bodyMedium, color = axisColor)
-                    }
-                } else {
-                    val maxVal = remember(plotPoints, maxOverride) {
-                        maxOverride ?: (plotPoints.maxOfOrNull { it.value }?.coerceAtLeast(1.0) ?: 1.0)
-                    }
-                    val steps = 4
-
-                    Column {
-                        Box(modifier = Modifier.weight(1f)) {
-                            androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
-                                val width = size.width
-                                val height = size.height
-                                val minVal = 0.0
-                                val safeTotalTime = totalDurationSeconds.coerceAtLeast(1L).toFloat()
-
-                                fun Double.toY(): Float =
-                                    (height - ((this.toFloat() - minVal.toFloat()) / (maxVal.toFloat() - minVal.toFloat()) * height))
-                                        .coerceIn(0f, height)
-
-                                fun Long.toX(): Float =
-                                    (this.toFloat() / safeTotalTime * width).coerceIn(0f, width)
-
-                                // Draw Zones
-                                zones.forEach { zone ->
-                                    val yStart = zone.max.toY()
-                                    val yEnd = zone.min.toY()
-                                    drawRect(
-                                        color = zone.color,
-                                        topLeft = androidx.compose.ui.geometry.Offset(0f, yStart),
-                                        size = androidx.compose.ui.geometry.Size(width, yEnd - yStart)
-                                    )
-                                }
-
-                                // Helper horizontal lines
-                                for (i in 0..steps) {
-                                    val yVal = (maxVal / steps) * i
-                                    val yPos = yVal.toY()
-                                    drawLine(
-                                        color = gridColor.copy(alpha = 0.6f),
-                                        start = androidx.compose.ui.geometry.Offset(0f, yPos),
-                                        end = androidx.compose.ui.geometry.Offset(width, yPos),
-                                        strokeWidth = 1.dp.toPx()
-                                    )
-                                }
-
-                                // Linha desenhada por tempo real (x), não por índice —
-                                // gaps de sensor já não distorcem a escala temporal.
-                                val path = androidx.compose.ui.graphics.Path()
-                                plotPoints.forEachIndexed { index, point ->
-                                    val x = point.timeSeconds.toX()
-                                    val y = point.value.toY()
-                                    if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
-                                }
-
-                                drawPath(
-                                    path = path,
-                                    color = color,
-                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
-                                )
+            Row(Modifier.fillMaxWidth().height(160.dp)) {
+                Canvas(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        // Só arrasto horizontal: o scroll vertical do ecrã continua a funcionar.
+                        .pointerInput(points) {
+                            fun pointAt(x: Float): PlotPoint {
+                                val t = (x / size.width * totalSeconds).toLong()
+                                val i = points.binarySearchBy(t) { it.timeSeconds }
+                                return points[if (i >= 0) i else (-i - 1).coerceAtMost(points.lastIndex)]
                             }
-
-                            // Y-axis text labels
-                            Column(
-                                modifier = Modifier.fillMaxHeight().padding(start = 4.dp),
-                                verticalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                for (i in steps downTo 0) {
-                                    val yVal = (maxVal / steps) * i
-                                    Text(
-                                        text = yVal.toInt().toString(),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = axisColor
-                                    )
-                                }
-                            }
+                            detectHorizontalDragGestures(
+                                onDragStart = { scrub = pointAt(it.x) },
+                                onDragEnd = { scrub = null },
+                                onDragCancel = { scrub = null },
+                                onHorizontalDrag = { change, _ -> scrub = pointAt(change.position.x) }
+                            )
                         }
+                ) {
+                    val w = size.width
+                    val h = size.height
+                    fun Double.toY() = (h - (this / axisMax * h).toFloat()).coerceIn(0f, h)
+                    fun Long.toX() = (this.toFloat() / totalSeconds * w).coerceIn(0f, w)
+                    val dash = PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 3.dp.toPx()))
 
-                        // X-axis (Time)
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("0:00", style = MaterialTheme.typography.labelSmall, color = axisColor)
-                            Text(formatDuration(totalDurationSeconds / 2), style = MaterialTheme.typography.labelSmall, color = axisColor)
-                            Text(formatDuration(totalDurationSeconds), style = MaterialTheme.typography.labelSmall, color = axisColor)
+                    for (i in 0..AXIS_STEPS) {
+                        val y = (axisMax / AXIS_STEPS * i).toY()
+                        drawLine(gridColor, Offset(0f, y), Offset(w, y), 1.dp.toPx(), pathEffect = if (i == 0) null else dash)
+                    }
+
+                    val line = Path()
+                    points.forEachIndexed { i, pt ->
+                        if (i == 0) line.moveTo(pt.timeSeconds.toX(), pt.value.toY()) else line.lineTo(pt.timeSeconds.toX(), pt.value.toY())
+                    }
+                    val area = Path().apply {
+                        addPath(line)
+                        lineTo(points.last().timeSeconds.toX(), h)
+                        lineTo(points.first().timeSeconds.toX(), h)
+                        close()
+                    }
+
+                    if (zones.isEmpty()) {
+                        drawPath(area, Brush.verticalGradient(listOf(color.copy(alpha = 0.45f), color.copy(alpha = 0.05f))))
+                        drawPath(line, color, style = Stroke(2.dp.toPx()))
+                    } else {
+                        // Cada faixa da área fica com a cor da sua zona de FC.
+                        zones.forEach { zone ->
+                            clipRect(top = zone.max.toY(), bottom = zone.min.toY()) { drawPath(area, zone.color) }
                         }
+                        drawPath(line, color, style = Stroke(1.5.dp.toPx()))
+                    }
+
+                    val avgY = avg.toY()
+                    drawLine(axisColor, Offset(0f, avgY), Offset(w, avgY), 1.dp.toPx(), pathEffect = dash)
+
+                    scrub?.let { pt ->
+                        val x = pt.timeSeconds.toX()
+                        drawLine(cursorColor, Offset(x, 0f), Offset(x, h), 1.dp.toPx())
+                        drawCircle(cursorColor, 5.dp.toPx(), Offset(x, pt.value.toY()))
+                        drawCircle(color, 3.5.dp.toPx(), Offset(x, pt.value.toY()))
                     }
                 }
+
+                Column(
+                    Modifier.fillMaxHeight().padding(start = 8.dp),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.End
+                ) {
+                    for (i in AXIS_STEPS downTo 0) {
+                        Text((axisMax / AXIS_STEPS * i).roundToInt().toString(), style = axisStyle)
+                    }
+                }
+            }
+
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(formatDuration(0), style = axisStyle)
+                Text(formatDuration(totalSeconds / 2), style = axisStyle)
+                Text(formatDuration(totalSeconds), style = axisStyle)
             }
         }
     }
+}
+
+private const val AXIS_STEPS = 4
+
+/** Topo do eixo Y arredondado para que cada uma das 4 divisões seja 1, 2 ou 5 × 10ⁿ (ex.: 237 → 400). */
+internal fun niceAxisMax(value: Double): Double {
+    val rawStep = value.coerceAtLeast(1.0) / AXIS_STEPS
+    var magnitude = 1.0
+    while (magnitude * 10 <= rawStep) magnitude *= 10
+    val step = listOf(1.0, 2.0, 5.0, 10.0).first { it * magnitude >= rawStep } * magnitude
+    return step * AXIS_STEPS
 }
 
 /**
@@ -516,11 +527,11 @@ private fun smoothMovingAverage(points: List<PlotPoint>, window: Int): List<Plot
 private fun buildHrZones(maxHr: Int): List<ChartZone> {
     val max = maxHr.toDouble()
     return listOf(
-        ChartZone(max * 0.50, max * 0.60, Color(0xFF9E9E9E).copy(alpha = 0.15f)), // Z1 Recuperação
-        ChartZone(max * 0.60, max * 0.70, Color(0xFF2196F3).copy(alpha = 0.15f)), // Z2 Resistência
-        ChartZone(max * 0.70, max * 0.80, Color(0xFF4CAF50).copy(alpha = 0.15f)), // Z3 Tempo
-        ChartZone(max * 0.80, max * 0.90, Color(0xFFFFC107).copy(alpha = 0.15f)), // Z4 Limiar
-        ChartZone(max * 0.90, max, Color(0xFFF44336).copy(alpha = 0.15f))          // Z5 VO2max
+        ChartZone(0.0, max * 0.60, Color(0xFF9E9E9E)),       // Z1 Recuperação
+        ChartZone(max * 0.60, max * 0.70, Color(0xFF3D8BD9)), // Z2 Resistência
+        ChartZone(max * 0.70, max * 0.80, Color(0xFF4CAF50)), // Z3 Tempo
+        ChartZone(max * 0.80, max * 0.90, Color(0xFFF29D38)), // Z4 Limiar
+        ChartZone(max * 0.90, max * 2, Color(0xFFE5483B))     // Z5 VO2max
     )
 }
 

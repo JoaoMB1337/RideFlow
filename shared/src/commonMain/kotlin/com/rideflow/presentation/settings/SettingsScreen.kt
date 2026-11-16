@@ -8,18 +8,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.DirectionsBike
-import androidx.compose.material.icons.filled.Bluetooth
-import androidx.compose.material.icons.automirrored.filled.BluetoothSearching
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -59,14 +52,9 @@ fun SettingsScreen(
                     .padding(16.dp)
             ) {
                 SectionHeader("Sensors")
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    shape = MaterialTheme.shapes.large
-                ) {
+                Column {
                     SensorSettingRow(
                         label = "Heart rate sensor",
-                        icon = Icons.Filled.Favorite,
-                        iconTint = MaterialTheme.colorScheme.tertiary,
                         deviceName = uiState.heartRateDeviceName,
                         connection = hrState,
                         onPair = { startScan(ScannerTarget.HeartRate) },
@@ -78,8 +66,6 @@ fun SettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     SensorSettingRow(
                         label = "Smart bike (FTMS)",
-                        icon = Icons.AutoMirrored.Filled.DirectionsBike,
-                        iconTint = MaterialTheme.colorScheme.primary,
                         deviceName = uiState.bikeDeviceName,
                         connection = bikeState,
                         onPair = { startScan(ScannerTarget.Bike) },
@@ -120,7 +106,7 @@ private fun SectionHeader(title: String) {
     Text(
         title,
         style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(start = 16.dp, bottom = 8.dp).semantics { heading() }
     )
 }
@@ -128,8 +114,6 @@ private fun SectionHeader(title: String) {
 @Composable
 private fun SensorSettingRow(
     label: String,
-    icon: ImageVector,
-    iconTint: Color,
     deviceName: String?,
     connection: SensorConnectionState,
     onPair: () -> Unit,
@@ -138,13 +122,6 @@ private fun SensorSettingRow(
 ) {
     Column(Modifier.fillMaxWidth().padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(40.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(22.dp))
-            }
-            Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
                 Text(label, style = MaterialTheme.typography.titleMedium)
                 Text(
@@ -161,11 +138,7 @@ private fun SensorSettingRow(
                 }
             }
             if (deviceName == null) {
-                Button(onClick = onPair) {
-                    Icon(Icons.AutoMirrored.Filled.BluetoothSearching, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Pair")
-                }
+                Button(onClick = onPair) { Text("Pair") }
             }
         }
 
@@ -176,11 +149,7 @@ private fun SensorSettingRow(
             ) {
                 val disconnected = connection is SensorConnectionState.Disconnected || connection is SensorConnectionState.Error
                 if (onReconnect != null && disconnected) {
-                    FilledTonalButton(onClick = onReconnect) {
-                        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Reconnect")
-                    }
+                    FilledTonalButton(onClick = onReconnect) { Text("Reconnect") }
                 }
                 OutlinedButton(
                     onClick = onUnpair,
@@ -203,7 +172,6 @@ private fun ScanDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.AutoMirrored.Filled.BluetoothSearching, contentDescription = null) },
         title = { Text("Pair $targetText") },
         text = {
             Column(Modifier.fillMaxWidth()) {
@@ -230,7 +198,6 @@ private fun ScanDialog(
                             ListItem(
                                 headlineContent = { Text(name) },
                                 supportingContent = { Text(address) },
-                                leadingContent = { Icon(Icons.Filled.Bluetooth, contentDescription = null) },
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                                 modifier = Modifier.clickable { onSelect(name, address) }
                             )
